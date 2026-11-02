@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandbox do galpão</title>
+<style>
+  :root { --paper: #f7f6f2; --line: #e0ddd6; --ink: #14181c; --soft: #5f6a72; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; margin: 0 12px 0 0; }
+  label { display: flex; gap: 6px; align-items: center; color: var(--soft); }
+  select, input, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+  button { cursor: pointer; }
+  main { padding: 12px 16px; }
+  canvas { width: 100%; max-width: 1100px; aspect-ratio: 8 / 6; display: block; background: #fff; border-radius: 8px; }
+  #status { margin: 8px 0; font-variant-numeric: tabular-nums; min-height: 20px; }
+  #err { color: #b3261e; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sandbox</h1>
+  <label>Missão <select id="mission"></select></label>
+  <label>Robô <select id="robot"></select></label>
+  <label>Piloto <select id="pilot"></select></label>
+  <label>Semente <input id="seed" type="number" value="1000" style="width:80px"></label>
+  <label>Velocidade <select id="speed"><option>1</option><option>2</option><option selected>4</option></select>×</label>
+  <button id="run">Rodar</button>
+  <label><input id="allRoutes" type="checkbox"> todas as rotas</label>
+</header>
+<main>
+  <div id="status"></div>
+  <canvas id="cv" width="1100" height="825"></canvas>
+  <div id="err"></div>
+</main>
+<script type="module">
+import { FLEET, fleetBody } from './core/parts.js';
+import { MISSIONS, WAREHOUSE } from './core/warehouse.js';
+import { Run, IdealRun } from './core/episode.js';
+import { planPath } from './core/planner.js';
+import { DT } from './core/physics.js';
+import { drawWarehouse, drawPath, drawTrail, drawTarget, drawRobotAt, drawDisc, viewFor } from './core/draw.js';
+import { PILOT_NAMES, loadPilot } from './core/pilots.js';
+
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+MISSIONS.forEach(m => $('mission').add(new Option(m.nome, m.id)));
+FLEET.forEach(f => $('robot').add(new Option(f.nome, f.id)));
+['ideal', ...PILOT_NAMES].forEach(p => $('pilot').add(new Option(p, p)));
+
+let run = null, body = null, raf = 0, ideal = false;
+const v = viewFor(WAREHOUSE, cv.width, cv.height);
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const m = MISSIONS.find(x => x.id === $('mission').value);
+  drawWarehouse(ctx, WAREHOUSE, v, { highlight: Object.entries(WAREHOUSE.stations).find(([, p]) => p === m.goal)?.[0] });
+  if ($('allRoutes').checked) {
+    const colR = fleetBody($('robot').value).colR;
+    for (const mm of MISSIONS) drawPath(ctx, planPath(WAREHOUSE, mm.start, mm.goal, colR), v);
+  }
+  if (!run) return;
+  drawPath(ctx, run.path, v);
+  const w = run.world;
+  drawTrail(ctx, w.trail, v, undefined, [w.x, w.y]);
+  drawTarget(ctx, run.target, v);
+  if (ideal) drawDisc(ctx, w, body.colR, v);
+  else drawRobotAt(ctx, body, w, v, { cmd: run.lastAct?.speed });
+  const st = w.done ? (w.reached ? 'chegou' : w.collided ? 'BATEU' : 'tempo esgotado') : 'rodando';
+  const t = run.target;
+  $('status').textContent = `${st} · ${(w.t * DT).toFixed(1)} s · alfa ${(t.alpha * 180 / Math.PI).toFixed(0)}° · vel. desejada ${t.vel.toFixed(2)} m/s · falta ${t.remaining.toFixed(1)} m`;
+}
+
+async function start() {
+  cancelAnimationFrame(raf);
+  $('err').textContent = '';
+  const m = MISSIONS.find(x => x.id === $('mission').value);
+  body = fleetBody($('robot').value);
+  const seed = +$('seed').value;
+  ideal = $('pilot').value === 'ideal';
+  try {
+    run = ideal ? new IdealRun(body.colR, m, seed) : new Run(body, m, seed, await loadPilot($('pilot').value));
+  } catch (e) { $('err').textContent = e.stack; return; }
+  let last = performance.now(), acc = 0;
+  const tick = now => {
+    acc += Math.min(0.1, (now - last) / 1000) * +$('speed').value; last = now;
+    while (acc >= DT && !run.world.done) { run.step(); acc -= DT; }
+    draw();
+    if (!run.world.done) raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+}
+
+$('run').onclick = start;
+for (const id of ['mission', 'robot', 'allRoutes']) $(id).onchange = () => { run = null; draw(); };
+draw();
+</script>
+</body>
+</html>

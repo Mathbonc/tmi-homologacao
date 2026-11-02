@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel da banca</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topo">
+    <h1>Painel da banca</h1>
+    <span id="contagem" class="selo"></span>
+    <span class="grow"></span>
+    <button id="atualizar">Atualizar</button>
+    <label class="row small" style="gap:6px"><input id="filtro-teste" type="checkbox" checked> ignorar apelidos que começam com "teste"</label>
+    <label class="row small" style="gap:6px">ou abrir arquivos baixados <input id="arquivos" type="file" accept=".json" multiple></label>
+  </div>
+  <p id="erro" class="aviso"></p>
+
+  <div class="card">
+    <h2>Decisões por cérebro</h2>
+    <p class="muted small">Quantas pessoas liberaram cada cérebro, em cada modo. Ainda sem revelar a verdade.</p>
+    <table><thead><tr><th>Cérebro</th><th class="num">liberaram na bancada</th><th class="num">liberaram no relatório</th>
+      <th class="num">confiança média</th></tr></thead><tbody id="t-decisoes"></tbody></table>
+  </div>
+
+  <div class="card">
+    <div class="row"><h2 class="grow" style="margin:0">A verdade</h2>
+      <button id="revelar" class="primary">Revelar a verdade</button></div>
+    <div id="verdade" class="hidden" style="margin-top:12px"></div>
+  </div>
+
+  <div id="revelado" class="hidden">
+    <div class="card">
+      <h2>H1 e H2: acerto e confiança por modo</h2>
+      <div id="kpis" class="kpis"></div>
+      <h3>Por cérebro</h3>
+      <table><thead><tr><th>Cérebro</th><th>Resposta certa</th><th class="num">acerto na bancada</th><th class="num">acerto no relatório</th></tr></thead>
+        <tbody id="t-acerto"></tbody></table>
+      <h3>O que o relatório mostrou em cada decisão</h3>
+      <table><thead><tr><th>Pessoa</th><th>Cérebro</th><th class="num">sucesso no relatório</th><th>Viu replay de falha</th><th>Decisão</th><th class="num">confiança</th></tr></thead>
+        <tbody id="t-relatorios"></tbody></table>
+    </div>
+
+    <div class="card">
+      <h2>H3: quem reprovou tinha visto a falha?</h2>
+      <table><thead><tr><th>Modo</th><th class="num">reprovações</th><th class="num">viram uma falha antes</th></tr></thead>
+        <tbody id="t-h3"></tbody></table>
+      <h3>Questão 3: o que te faria reprovar na hora?</h3>
+      <div id="q3"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>H4: quem deveria assinar?</h2>
+    <div id="q4"></div>
+    <h3>Questão 2: qual modo deu mais segurança?</h3>
+    <div id="q2"></div>
+    <h3>Questão 1: liberaria ao lado de pessoas?</h3>
+    <div id="q1"></div>
+  </div>
+
+  <div class="card">
+    <h2>Respostas abertas</h2>
+    <div id="abertas"></div>
+  </div>
+</div>
+<script type="module" src="painel.js"></script>
+</body>
+</html>

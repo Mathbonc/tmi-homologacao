@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banca de homologação</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 1. Entrada -->
+<section id="tela-entrada" class="wrap narrow">
+  <div class="card">
+    <h1>Banca de homologação de robôs</h1>
+    <blockquote class="regra">
+      Você é da banca de homologação de uma fábrica. Quatro cérebros de robô pedem liberação para
+      operar no galpão. Um cérebro é uma rede neural: você não consegue abrir para conferir, só
+      pode testar.<br><br>
+      <b>Regra da fábrica:</b> um cérebro só pode ser liberado se pilotar <b>todos os robôs da
+      frota</b>, em <b>todas as missões</b>, sem bater e dentro do tempo.
+    </blockquote>
+    <p>Você vai avaliar os 4 cérebros, um de cada vez (uns 5 minutos cada). Em dois deles você
+      testa sozinho na <b>bancada</b>: escolhe robô e missão e assiste. Nos outros dois você usa
+      um <b>relatório automático</b>, que roda 40 corridas sorteadas. Para cada cérebro, você decide
+      se libera ou não. No fim há um questionário curto.</p>
+    <p class="muted small">A rota (linha tracejada) vem de um planejador comum, que funciona. O que
+      está sendo testado é o cérebro, que transforma a rota em comandos para as rodas de cada robô.</p>
+    <div class="pergunta">
+      <b>Seu apelido</b>
+      <input id="apelido" type="text" maxlength="40" autocomplete="off" style="width:100%">
+    </div>
+    <div class="pergunta">
+      <b>Número de participante</b>
+      <span class="muted small">o número que o Matheus escreveu no quadro para você (de fora da turma? escolha qualquer número de 1 a 6)</span>
+      <input id="participante" type="number" min="1" max="99" style="width:120px; display:block; margin-top:4px">
+    </div>
+    <p id="erro-entrada" class="aviso"></p>
+    <div class="row">
+      <button id="comecar" class="primary big">Começar</button>
+      <button id="continuar" class="hidden"></button>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Um cérebro -->
+<section id="tela-cerebro" class="wrap hidden">
+  <div class="topo">
+    <h1 id="c-titulo">Cérebro</h1>
+    <span id="c-selo" class="selo"></span>
+    <span id="c-posicao" class="muted"></span>
+    <span class="grow"></span>
+    <span class="muted small">tempo neste cérebro: <b id="c-relogio" class="relogio">0:00</b> (sugerido: ~5 min)</span>
+  </div>
+  <p id="c-instrucao" class="muted"></p>
+
+  <div class="mesa">
+    <div class="card">
+      <canvas id="cv" class="galpao" width="1000" height="750"></canvas>
+      <div class="row" style="margin-top:8px">
+        <span class="muted small">velocidade</span>
+        <span id="velocidades" class="row" style="gap:4px"></span>
+        <span class="grow"></span>
+      </div>
+      <div id="status" class="status"></div>
+    </div>
+
+    <div>
+      <!-- bancada -->
+      <div id="painel-bancada" class="card hidden">
+        <h2>Bancada</h2>
+        <h3>Robô</h3>
+        <div id="robos" class="robos"></div>
+        <h3>Missão</h3>
+        <div id="missoes" class="missoes"></div>
+        <div class="row" style="margin-top:12px">
+          <button id="rodar" class="primary big">Rodar</button>
+          <span class="muted small">a saída varia um pouco a cada corrida</span>
+        </div>
+        <h3>Corridas com este cérebro <span id="n-corridas" class="muted"></span></h3>
+        <div class="lista-corridas"><table><tbody id="corridas"></tbody></table></div>
+      </div>
+
+      <!-- relatório -->
+      <div id="painel-relatorio" class="card hidden">
+        <h2>Relatório automático</h2>
+        <p class="muted small">Roda 40 corridas sorteadas (robô e missão ao acaso, entre os mesmos da
+          bancada), sem desenhar, e resume o resultado.</p>
+        <button id="avaliar" class="primary big">Rodar avaliação</button>
+        <div id="progresso" class="hidden" style="margin-top:10px">
+          <div class="barra"><div id="barra"></div></div>
+          <span id="progresso-txt" class="muted small"></span>
+        </div>
+        <div id="resultado" class="hidden">
+          <div style="margin-top:12px"><span id="taxa" class="taxa-grande"></span>
+            <span id="taxa-txt" class="muted"></span></div>
+          <h3>As 3 piores corridas</h3>
+          <table><tbody id="piores"></tbody></table>
+          <h3>Por robô</h3>
+          <table><thead><tr><th>Robô</th><th class="num">chegou</th></tr></thead><tbody id="por-robo"></tbody></table>
+          <h3>Por missão</h3>
+          <table><thead><tr><th>Missão</th><th class="num">chegou</th></tr></thead><tbody id="por-missao"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- decisão -->
+  <div class="card" id="decisao">
+    <h2 id="d-titulo">Sua decisão</h2>
+    <div class="pergunta">
+      <b>Você libera este cérebro para operar no galpão?</b>
+      <div class="opcoes">
+        <label><input type="radio" name="decisao" value="libero"> Libero</label>
+        <label><input type="radio" name="decisao" value="nao_libero"> Não libero</label>
+      </div>
+    </div>
+    <div class="pergunta">
+      <b>Quanta confiança você tem nessa decisão?</b>
+      <div class="opcoes" id="confianca">
+        <label><input type="radio" name="confianca" value="1"> 1 · nenhuma</label>
+        <label><input type="radio" name="confianca" value="2"> 2</label>
+        <label><input type="radio" name="confianca" value="3"> 3</label>
+        <label><input type="radio" name="confianca" value="4"> 4</label>
+        <label><input type="radio" name="confianca" value="5"> 5 · total</label>
+      </div>
+    </div>
+    <div class="pergunta">
+      <b>Por quê?</b>
+      <textarea id="porque" maxlength="600" placeholder="Uma ou duas frases"></textarea>
+    </div>
+    <p id="d-falta" class="muted small"></p>
+    <button id="confirmar" class="primary big" disabled>Confirmar e seguir</button>
+  </div>
+</section>
+
+<!-- 3. Questionário -->
+<section id="tela-questionario" class="wrap narrow hidden">
+  <div class="card">
+    <h1>Questionário final</h1>
+    <p class="muted">Cinco perguntas rápidas. As respostas abertas podem ser curtas.</p>
+
+    <div class="pergunta">
+      <b>1. Você liberaria algum destes cérebros para trabalhar ao lado de pessoas? Qual?</b>
+      <div class="opcoes" id="q1">
+        <label><input type="checkbox" value="1"> Cérebro 1</label>
+        <label><input type="checkbox" value="2"> Cérebro 2</label>
+        <label><input type="checkbox" value="3"> Cérebro 3</label>
+        <label><input type="checkbox" value="4"> Cérebro 4</label>
+        <label><input type="checkbox" value="nenhum"> Nenhum</label>
+      </div>
+    </div>
+    <div class="pergunta">
+      <b>2. Qual modo te deu mais segurança para decidir?</b>
+      <div class="opcoes">
+        <label><input type="radio" name="q2" value="bancada"> Bancada (testar sozinho)</label>
+        <label><input type="radio" name="q2" value="relatorio"> Relatório automático</label>
+        <label><input type="radio" name="q2" value="igual"> Igual</label>
+      </div>
+    </div>
+    <div class="pergunta">
+      <b>3. O que te faria reprovar um robô na hora?</b>
+      <div class="opcoes">
+        <label><input type="radio" name="q3" value="numero"> O número (taxa de sucesso)</label>
+        <label><input type="radio" name="q3" value="ver_falha"> Ver a falha acontecendo</label>
+        <label><input type="radio" name="q3" value="explicacao"> Uma explicação do motivo</label>
+        <label><input type="radio" name="q3" value="outro"> Outro</label>
+      </div>
+      <input id="q3-outro" type="text" class="hidden" placeholder="Qual?" style="width:100%">
+    </div>
+    <div class="pergunta">
+      <b>4. Quem deveria assinar essa liberação?</b>
+      <div class="opcoes">
+        <label><input type="radio" name="q4" value="empresa_cerebro"> A empresa que fez o cérebro</label>
+        <label><input type="radio" name="q4" value="fabricante_robo"> O fabricante do robô</label>
+        <label><input type="radio" name="q4" value="governo"> Um órgão do governo</label>
+        <label><input type="radio" name="q4" value="certificadora"> Uma certificadora independente</label>
+        <label><input type="radio" name="q4" value="fabrica_usuaria"> A fábrica que vai usar</label>
+      </div>
+    </div>
+    <div class="pergunta">
+      <b>5. O que faltou para você decidir com segurança?</b>
+      <textarea id="q5" maxlength="800"></textarea>
+    </div>
+    <p id="q-falta" class="muted small"></p>
+    <button id="enviar" class="primary big" disabled>Enviar respostas</button>
+  </div>
+</section>
+
+<!-- 4. Fim -->
+<section id="tela-fim" class="wrap narrow hidden">
+  <div class="card">
+    <h1>Obrigado!</h1>
+    <p id="fim-msg"></p>
+    <p class="muted">Quais cérebros tinham defeito será revelado na conversa, depois que todos terminarem.
+      Por favor, não conte suas decisões para quem ainda está avaliando.</p>
+    <div class="row">
+      <button id="baixar">Baixar minhas respostas</button>
+      <button id="reenviar" class="hidden">Tentar enviar de novo</button>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
