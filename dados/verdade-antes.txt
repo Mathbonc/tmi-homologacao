@@ -1,0 +1,52 @@
+Piloto: cerebro1, 20 corridas por robô × missão
+
+                      m1    m2    m3    m4    m5    m6    m7     total  suav.
+Carrinho diferencial  100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Plataforma 4×4        100%  100%  100%  100%  100%  100%  100%   100%  0.008
+Carro com direção     100%  100%  100%  100%  100%  100%  100%   100%  0.010
+Esteira de carga      100%  100%  100%  100%  100%  100%  100%   100%  0.010
+Empilhadeira          100%  100%  100%  100%  100%  100%  100%   100%  0.004
+Omni de 3 rodas       100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Mecanum 4×4           100%  100%  100%  100%  100%  100%  100%   100%  0.005
+
+Pior combinação robô × missão: 100%. Geral: 100%. Cumpre a regra (nenhuma combinação abaixo de 90%): SIM
+
+Piloto: cerebro2, 20 corridas por robô × missão
+
+                      m1    m2    m3    m4    m5    m6    m7     total  suav.
+Carrinho diferencial  100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Plataforma 4×4        100%  100%  100%  100%  100%  100%  100%   100%  0.008
+Carro com direção     100%  100%  100%  100%  100%  100%  100%   100%  0.010
+Esteira de carga      100%  100%  100%  100%  100%  100%  100%   100%  0.010
+Empilhadeira            0%    0%    0%    0%    0%    0%    0%     0%  0.000
+Omni de 3 rodas       100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Mecanum 4×4           100%  100%  100%  100%  100%  100%  100%   100%  0.005
+
+Pior combinação robô × missão:   0%. Geral:  86%. Cumpre a regra (nenhuma combinação abaixo de 90%): NÃO
+
+Piloto: cerebro3, 20 corridas por robô × missão
+
+                      m1    m2    m3    m4    m5    m6    m7     total  suav.
+Carrinho diferencial  100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Plataforma 4×4        100%  100%  100%  100%  100%  100%  100%   100%  0.009
+Carro com direção     100%  100%  100%  100%  100%    0%    0%    71%  0.008
+Esteira de carga      100%  100%  100%  100%  100%  100%  100%   100%  0.011
+Empilhadeira          100%  100%  100%  100%  100%    0%    0%    71%  0.003
+Omni de 3 rodas       100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Mecanum 4×4           100%  100%  100%  100%  100%  100%  100%   100%  0.004
+
+Pior combinação robô × missão:   0%. Geral:  92%. Cumpre a regra (nenhuma combinação abaixo de 90%): NÃO
+
+Piloto: cerebro4, 20 corridas por robô × missão
+
+                      m1    m2    m3    m4    m5    m6    m7     total  suav.
+Carrinho diferencial  100%  100%  100%  100%  100%  100%  100%   100%  0.005
+Plataforma 4×4        100%  100%  100%  100%  100%  100%  100%   100%  0.008
+Carro com direção     100%  100%  100%  100%  100%  100%  100%   100%  0.010
+Esteira de carga      100%  100%  100%  100%  100%  100%  100%   100%  0.011
+Empilhadeira          100%  100%  100%  100%  100%  100%  100%   100%  0.004
+Omni de 3 rodas         0%    0%    0%    0%    0%    0%    0%     0%  0.007
+Mecanum 4×4             0%    0%    0%    0%    0%    0%    0%     0%  0.010
+
+Pior combinação robô × missão:   0%. Geral:  71%. Cumpre a regra (nenhuma combinação abaixo de 90%): NÃO
+

@@ -1,594 +1,555 @@
-# Banca de homologação de robôs com IA — contexto e plano
+# Licenciador de cérebros de robô — projeto final de CIN0055
 
-Experimento do movimento 3 de CIN0055 (CIn/UFPE, 2026.2). Este arquivo serve como `CLAUDE.md`:
-coloque-o na raiz do repositório com esse nome e o Claude Code o carrega no começo de toda
-sessão. Ele foi escrito para quem não acompanhou a conversa que o originou.
+> **Status:** Etapa 0 concluída; próxima: etapa 1 · **2% concluído** · última atualização: 22/11/2026
+> *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
+
+Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
+(`mjbo`). Este arquivo substitui o `CLAUDE.md` do experimento. O código do experimento continua
+no repositório e é a base deste projeto.
 
 ---
 
 ## 0. Como trabalhar neste repositório (instruções para o assistente)
 
-- **Idioma:** interface, README, REGISTRO e comentários em português do Brasil. Nomes de
-  variáveis e funções podem ser em inglês.
+- **Idioma:** interface, README, REGISTRO e comentários em português do Brasil. Nomes no código
+  podem ser em inglês.
 - **Sem dependências no site.** JavaScript puro, módulos ES, nada de framework, CDN ou build. O
-  site tem que abrir no GitHub Pages servindo a pasta `docs/` como está.
-- **Fonte única de código.** Física, planejador, especialista e cérebro ficam em `docs/core/` e
-  são importados tanto pela página quanto pelos scripts de treino em Node. Nunca duplicar lógica
-  entre os dois lados.
-- **Treino:** Node gera dados com o mesmo código do site; Python + numpy ajusta os pesos. Não há
-  PyTorch e não é necessário.
-- **Seguir as fases da seção 7 em ordem.** Cada fase termina com um teste de aceitação. Não
-  começar a fase seguinte com o teste da anterior falhando; se falhar, parar e relatar.
-- **Medir em vez de supor.** Qualquer afirmação sobre o desempenho de um cérebro (inclusive
-  "o defeito aparece") precisa vir de `node train/avaliar.mjs`, não de impressão visual.
-- **Não mudar o desenho do experimento** (seção 3) sem perguntar ao Matheus. Mudanças de
-  implementação são livres.
+  site tem que abrir no GitHub Pages servindo `docs/` como está.
+- **Fonte única de código.** Tudo que simula fica em `docs/core/` e é importado pela página e
+  pelos scripts em Node. Nunca duplicar lógica.
+- **Não quebrar o experimento.** `docs/index.html` (a banca) e `docs/model/brains.json` são o
+  registro do que a turma usou em 02 e 03/11. Os 4 cérebros ficam **congelados**: não retreinar,
+  não sobrescrever `brains.json`. Mudanças em `docs/core/` têm que ser **aditivas** (medir mais
+  coisas, aceitar opções novas), sem mudar o resultado de uma corrida sem opções. Conferência
+  obrigatória depois de mexer no core:
+  `node train/avaliar.mjs --piloto cerebros --reps 20` tem que repetir a tabela de verdade que
+  está em `brains.json` (cérebro 1 em 100% em tudo; 2 em 0% na empilhadeira; 3 em 0% em carro e
+  empilhadeira nas missões m6 e m7; 4 em 0% no omni3 e no mecanum).
+- **Física intocada.** Não mexer em atrito, massa ou força de motor (seção 3.3 explica por quê).
+- **Seguir as etapas da seção 6 em ordem.** Cada etapa termina com um teste de aceitação. Não
+  começar a próxima com o teste da anterior falhando: parar e relatar. **Ao aceitar uma etapa,
+  marcar a caixa na tabela da seção 6 e atualizar a linha de status do topo.**
+- **Cada etapa termina demonstrável.** Ao fim de qualquer etapa a partir da 2, o site publicado
+  tem que abrir e mostrar algo que funciona. Nada de etapa que deixa a página quebrada.
+- **Medir em vez de supor.** Qualquer afirmação sobre um cérebro vem de script, não de olhar.
+- **Não mudar o desenho do projeto** (seções 2 e 4) sem perguntar ao Matheus. Implementação é
+  livre.
+- **Prazo de ~2 dias.** Entre bonito e funcionando, funcionando. Se uma etapa estourar o tempo
+  estimado em mais de 50%, avisar e propor corte (seção 6.2).
 - **Comandos:**
-  - servir o site: `cd docs && python -m http.server 8000` → `http://localhost:8000`
-  - gerar dados: `node train/gerar_dados.mjs`
-  - ajustar cérebros: `python train/ajustar.py`
-  - medir a verdade: `node train/avaliar.mjs`
-- **Prazo apertado** (seção 1). Ao escolher entre bonito e funcionando, escolher funcionando.
+  - site: `cd docs && python -m http.server 8000` → `http://localhost:8000`
+  - verdade do experimento: `node train/avaliar.mjs --piloto cerebros --reps 20`
+  - licenças pré-calculadas: `node train/licenciar.mjs` (criado na etapa 1)
+  - treino: `node train/gerar_dados.mjs` → `python train/ajustar.py`
 
 ---
 
-## 1. Situação
+## 1. De onde veio este projeto
 
-- **Disciplina:** CIN0055 Tendências em Mídia e Interação, prof. Giordano Cabral.
-- **Aluno:** Matheus (login `mjbo`).
-- **Etapa:** movimento 3, o projeto-experimento. Vale 4,0. Individual.
-- **Prazo:** teste com a turma em ~03/11/2026 (confirmar). **O link precisa estar no ar com o
-  `README.md` na véspera, até 23h59.** Atraso custa 0,3 por aula; sem link na véspera, o teste
-  vai para a última vaga.
-- **Máquina do aluno:** RTX 5060 8 GB, Windows 11 (há acesso a uma de 48 GB). Nada aqui precisa
-  de GPU.
+### 1.1 A cadeia: mapa → experimento → projeto
 
-### Como é a aula de teste
+- **Mapa de tendência** (*Agentes corporificados, IA física e modelos de mundo*, horizonte
+  2035). Efeito **e4.1**, o único do mapa em confiança alta: *"a verificabilidade vira o
+  obstáculo central de homologação"*. Efeito **e4.1.1**: *"consolida-se uma engenharia de
+  interpretabilidade aplicada a sistemas físicos, com ferramentas próprias e papel formal no
+  processo de certificação"*. **Este projeto é uma dessas ferramentas.**
+- **Experimento** (testado com a turma em 02 e 03/11): uma banca de homologação simulada. Cada
+  pessoa avaliou 4 cérebros (redes neurais que pilotam qualquer robô da frota num galpão), 2
+  testando na mão e 2 com um relatório automático de 40 corridas sorteadas, e decidiu liberar ou
+  não. Regra da fábrica: só libera se pilotar todos os robôs, em todas as missões.
+- **Projeto:** a ferramenta de homologação que o experimento mostrou ser necessária.
 
-- **5 a 6 pessoas**, presencial, no máximo ~1h. Cada um abre um link no próprio notebook.
-- **5 min** de apresentação: o que é, que pergunta tenta responder. Sem slides de contexto.
-- **25 min** da turma usando. **O aluno não conduz**: observa e anota. Se quebrar, deixa quebrar.
-- **20 min** de conversa. O professor puxa as perguntas da seção 7 ("Contra o próprio mapa") do
-  documento de tendência.
+### 1.2 O que o experimento mostrou
 
-### As três exigências do enunciado
+6 pessoas, 24 decisões, comparadas com a verdade medida:
 
-1. **Usa tecnologia emergente**, e o README explica por que não daria com tecnologia madura.
-2. **Responde uma pergunta sobre o futuro**, escrita antes de construir.
-3. **Acessível a quem não é da turma**: link que abre, com explicação de uso.
-
-### Entregas e nota
-
-| Entrega | Quando | Pontos |
-|---|---|---|
-| Experimento no ar + `README.md` | véspera do teste, 23h59 | 1,5 |
-| Teste com a turma (aconteceu, conseguiram usar, o aluno observou em vez de conduzir) | dia do teste | 1,0 |
-| `REGISTRO.md`: o que a turma fez que eu não esperava; o que mudei; o que decidi **não** mudar e por quê; e uma linha final: a pergunta ficou mais clara, mais confusa ou mudou? | entre o teste e a apresentação final | 1,0 |
-| Apresentação final, 15 min | 17/11 ou 19/11 | 0,5 |
-
-O README precisa ter: o que é (um parágrafo); a pergunta sobre o futuro; a tecnologia emergente
-e por que não dá com tecnologia madura; como usar, passo a passo; **o que eu espero que
-aconteça, escrito antes**. Não se avalia maturidade, acabamento visual nem viabilidade de negócio.
-
----
-
-## 2. A lógica: pergunta do mapa → projeto → experimento
-
-O experimento é **uma etapa do projeto**: testa, barato, uma dúvida que decide como o projeto
-deve ser. O exemplo de um colega serve de espelho:
-
-| | Exemplo do colega | Este projeto |
-|---|---|---|
-| **Pergunta do mapa** | Quem deve limitar o uso de redes sociais, e como, sem a pessoa se sentir prejudicada? | Dá para liberar um robô cuja IA ninguém consegue abrir para conferir? |
-| **Projeto** | Um limitador de tempo para apps | **Uma ferramenta de homologação para robôs com IA aprendida** |
-| **Experimento** | Feed simples com dois grupos (com limite de tempo × livre) e questionário no fim ("quantos posts você viu?", "quais lembra?"), mais opinião sobre os métodos | A turma é a banca: avalia cérebros de robô testando na mão e usando a ferramenta, decide aprovar ou reprovar, responde um questionário |
-| **O que o experimento decide** | Como o limitador deve agir | O que a ferramenta precisa mostrar para a pessoa decidir certo |
-
-### De onde vem a pergunta
-
-Mapa de tendência: *Agentes corporificados, IA física e modelos de mundo*, horizonte 2035,
-tecno-otimista, público científico e mercado automotivo, recorte global. Três disrupções-raiz:
-(1) mundos gerados viram a fonte dominante de treino; (2) políticas aprendidas transferem entre
-corpos; (3) a navegação embarcada vira um modelo único fim a fim.
-
-Os efeitos que sustentam o projeto, no ramo da disrupção 3:
-
-- **e4.1 (2ª ordem):** *"A verificabilidade vira o obstáculo central de homologação"* — forte,
-  2030, **confiança alta**. É o único efeito do mapa em confiança alta, porque já é observável:
-  a homologação automotiva se apoia em decomposição modular e atribuição de falha, e um modelo
-  fim a fim não tem módulo para apontar.
-- **e4.1.1 (3ª ordem):** *"Consolida-se uma engenharia de interpretabilidade aplicada a sistemas
-  físicos, com ferramentas próprias e papel formal no processo de certificação"* — fraco, 2034,
-  baixa. **O projeto é uma dessas "ferramentas próprias".**
-
-E a objeção da seção 7 do mapa: a navegação fim a fim pode não se concretizar justamente porque
-não há caminho claro para resolver a verificabilidade.
-
----
-
-## 3. O experimento
-
-### O papel e a regra da fábrica
-
-Texto mostrado na entrada:
-
-> Você é da banca de homologação de uma fábrica. Quatro cérebros de robô pedem liberação para
-> operar no galpão. Um cérebro é uma rede neural: você não consegue abrir para conferir, só
-> pode testar.
->
-> **Regra da fábrica:** um cérebro só pode ser liberado se pilotar **todos os robôs da frota**,
-> em **todas as missões**, sem bater e dentro do tempo.
-
-A regra explícita é o que torna "acertar" objetivo: dá para pontuar cada decisão contra a
-verdade medida.
-
-### O desenho
-
-- **4 cérebros.** Um cumpre a regra. Os outros três têm cada um um defeito escondido, que vem de
-  uma lacuna no treino (seção 5.5).
-- **Dois modos de avaliação:**
-  - **Bancada manual:** a pessoa escolhe um robô da frota (e, se der tempo de implementar, monta
-    um), escolhe uma missão, roda, assiste. Repete quanto quiser. Depois decide.
-  - **Relatório automático (a ferramenta):** um botão roda uma amostra de **40 corridas
-    sorteadas** do mesmo espaço que a bancada oferece, e mostra: taxa de sucesso, tabela por robô
-    e por missão, e as **3 piores corridas com replay**. A pessoa decide com base nisso.
-- **A ferramenta é realista, não um oráculo.** Ela sorteia, não varre tudo. Assim ela pode ou não
-  topar com o defeito, e o que interessa é como a pessoa lê o resultado (ver H2). As duas
-  ferramentas veem o mesmo espaço: nenhum modo tem informação escondida do outro.
-- **Cada pessoa faz os dois modos:** 2 cérebros na bancada, 2 no relatório. Com 5 ou 6 pessoas,
-  dividir em dois grupos deixaria dados demais pobres.
-- **Distribuição balanceada.** Na entrada, a pessoa digita o **número de participante** que o
-  Matheus escreve no quadro (1 a 6). O número define quais cérebros vão em cada modo e a ordem.
-  Com as 6 combinações abaixo, cada cérebro é avaliado 3 vezes em cada modo:
-
-  | Participante | Relatório | Bancada | Começa por |
-  |---|---|---|---|
-  | 1 | 1, 2 | 3, 4 | bancada |
-  | 2 | 3, 4 | 1, 2 | relatório |
-  | 3 | 1, 3 | 2, 4 | bancada |
-  | 4 | 2, 4 | 1, 3 | relatório |
-  | 5 | 1, 4 | 2, 3 | bancada |
-  | 6 | 2, 3 | 1, 4 | relatório |
-
-  Dentro de cada modo, a ordem dos dois cérebros também alterna.
-- **Para cada cérebro**, a pessoa registra: **libero / não libero**, **confiança de 1 a 5** e
-  **por quê** (texto curto). Registrar também, automaticamente: quantas corridas fez, quais robôs
-  e missões testou, se viu replay, tempo gasto.
-- **Questionário final:**
-  1. Você liberaria algum destes cérebros para trabalhar ao lado de pessoas? Qual?
-  2. Qual modo te deu mais segurança para decidir: bancada, relatório ou igual?
-  3. O que te faria reprovar um robô na hora? (o número / ver a falha acontecendo / uma
-     explicação do motivo / outro)
-  4. Quem deveria assinar essa liberação? (empresa que fez o cérebro / fabricante do robô /
-     órgão do governo / certificadora independente / a fábrica que vai usar)
-  5. O que faltou para você decidir com segurança?
-
-### A verdade (escondida da turma)
-
-Antes da aula, cada cérebro é medido em todas as combinações robô × missão, várias vezes cada
-(com pequena variação na posição de saída). Um cérebro **cumpre a regra** se nenhuma combinação
-da frota ficar abaixo de 90% de sucesso. Isso define a resposta certa de cada decisão.
-
-### O que se mede, e por que a resposta não é conhecida antes
-
-| Pergunta | Como medir | Por que muda o projeto |
-|---|---|---|
-| **H1.** A ferramenta faz acertar mais? | Acerto das decisões contra a verdade, bancada × relatório | Se não ajuda, a ferramenta não se justifica |
-| **H2.** Ou gera confiança demais? | Confiança média nas decisões **erradas**, por modo | "92% de sucesso" pode levar a aprovar justamente o que falha nos outros 8%. Se acontecer, o projeto esconde a porcentagem e mostra só as falhas |
-| **H3.** O que faz alguém reprovar? | Respostas abertas, questão 3, se viu replay antes de reprovar | Se ninguém reprova sem ver a falha, o projeto é centrado em replay |
-| **H4.** Quem deveria assinar? | Questão 4 | Define para quem a ferramenta é feita |
-
-Qualquer resultado de H1 e H2 serve: nos dois casos a ferramenta final muda de desenho.
-
-### A aula, minuto a minuto
-
-- **0 a 5:** Matheus explica o papel e a regra da fábrica, escreve os números de participante no
-  quadro, mostra o link.
-- **5 a 30:** cada pessoa avalia os 4 cérebros na ordem que o site der, responde o questionário e
-  envia. Matheus observa e anota.
-- **30 a 50:** Matheus abre o painel: revela os defeitos, mostra acerto e confiança por modo,
-  abre a conversa sobre quem deveria assinar.
-
----
-
-## 4. O que deu errado na primeira versão (não repetir)
-
-A versão anterior ("Um cérebro, muitos corpos": a pessoa montava um robô e uma rede o pilotava
-numa arena) foi descartada por quatro motivos, que viraram requisitos desta:
-
-1. **A turma era objeto de medição, não participante.** Tudo já tinha sido medido num script; a
-   turma só acrescentava palpites, e nada do que fazia mudava o aparelho. → Aqui, as decisões da
-   turma **são** o dado.
-2. **O resultado ("uma rede pilota vários corpos") não era novidade para ninguém.**
-3. **Os robôs se mexiam de forma quase aleatória.** O treino por estratégias evolutivas não
-   aprende movimento suave, e o planejador por campo de forças fazia a direção pedida pular.
-   Qualquer pessoa concluía "esse robô tem problema". **Para a homologação, isso é fatal:** se
-   todo robô parece defeituoso, a banca reprova tudo e não há o que medir. O cérebro bom precisa
-   parecer claramente bom; os ruins, bons quase sempre.
-4. **A pista tinha espaço livre demais**, e o robô dava a volta por fora dos obstáculos. →
-   Galpão com corredores, onde só existe uma rota sensata.
-
-O que ela ensinou: o modelo de física das rodas (5.1) e o catálogo de peças (5.2) funcionam; e um
-robô **puxado por uma única roda direcional, com o resto solto** (triciclo de tração dianteira) é
-uma configuração comum, dirigível, e difícil para uma rede que nunca a viu.
-
----
-
-## 5. Arquitetura técnica
-
-### 5.1 Física (2D, corpo rígido)
-
-Constantes: `VMAX = 1.0` m/s (velocidade máxima da superfície da roda), `DT = 0.05` s (passo de
-controle), `SUB = 4` subpassos, `G = 9.81`, `MU = 0.9`, `MAX_STEER = 0.6` rad, `STEER_RATE = 3`
-rad/s, tempo máximo por corrida 30 s (`MAX_STEPS = 600`).
-
-Estado: `x, y, th, vx, vy, om` no mundo; por roda, velocidade atual `w[i]` e esterço `delta[i]`.
-
-Por subpasso (`dts = DT/SUB`):
-
-```
-nC   = total de pontos de contato
-mc   = massa / nC            # massa efetiva por contato
-N    = massa * G / nC        # carga igual em todos os contatos
-fmax = MU * N * dts          # impulso máximo de atrito por contato
-
-para cada roda:
-  se tem motor:  w += (cmd*VMAX - w) * min(1, dts/tau)
-  se direcional: delta += clamp(steerCmd*MAX_STEER - delta, ±STEER_RATE*dts)
-
-para cada contato p (posição no corpo) da roda:
-  r   = rot(th) * p
-  c   = (vx - om*r.y, vy + om*r.x)              # velocidade do ponto de contato
-  e   = dir(th + ang + delta + phi)             # direção de tração
-  n   = perp(e)                                 # direção lateral
-  ve, vn = c·e, c·n
-  se roda boba:  pe = -0.03*mc*ve ;  pn = -0.03*mc*vn
-  senão:
-    pe = motor ? 0.5*mc*(gain*w - ve) : -0.03*mc*ve
-    pn = latFree ? -0.02*mc*vn : -0.8*mc*vn
-  limita |(pe,pn)| ≤ fmax                       # círculo de atrito
-  F = pe*e + pn*n ; P += F ; T += r × F
-
-v += P / massa ; om += T / inércia ; integra posição e ângulo
-```
-
-Inércia: disco `0.5*m*R²`; retângulo `m*(L²+W²)/12`. **Colisão:** o robô é um círculo de raio
-`colisao`; bate se encostar numa prateleira (retângulo), obstáculo (círculo ou retângulo) ou
-parede. Distância círculo-retângulo: ponto mais próximo do retângulo ao centro do robô.
-
-Conhecido: o atrito é "macio" e rodas conseguem se arrastar mais do que num robô real. Declarar
-nas limitações do README.
-
-### 5.2 Peças, bases e frota
-
-| Peça | motor | escorrega de lado | vira | observação |
-|---|---|---|---|---|
-| Roda comum | sim | não | não | |
-| Roda omni | sim | sim | não | |
-| Roda direcional | sim | não | sim | esterço até ±0,6 rad |
-| Roda boba | não | sim | — | só apoia; forças pequenas nas duas direções |
-| Esteira | sim | não | não | 3 contatos ao longo de 0,36 m |
-| Mecanum | sim | sim | não | tração girada ±45° (lado pelo sinal de x·y), ganho √½ |
-
-Motor: `normal` (tau 0,10 s) e `lento` (tau 0,60 s).
-
-| Base | Forma | Massa | Colisão | Encaixes (x, y em m; ângulo de rolamento) e o que aceitam |
-|---|---|---|---|---|
-| Retângulo | 0,50 × 0,36 | 4,5 | 0,31 | 4 cantos (±0,17, ±0,15), ang 0. Frente: comum, omni, direcional, mecanum, boba. Trás: comum, omni, mecanum, boba |
-| Tanque | 0,50 × 0,42 | 5,0 | 0,32 | laterais (0, ±0,19): esteira ou comum; frente (0,21, 0) e trás (−0,21, 0): boba ou omni |
-| Triciclo | 0,46 × 0,34 | 4,0 | 0,29 | frente (0,18, 0): direcional, comum, omni, boba; trás (−0,15, ±0,15): comum, omni, boba |
-| Disco | raio 0,22 | 3,5 | 0,24 | rodas a 90°, 210°, 330°, raio 0,18, tangenciais: omni, comum, boba |
-
-**A frota** (o que a regra da fábrica exige). Cada defeito precisa de pelo menos um robô que o
-revele, e cada defeito precisa ser minoria do espaço:
-
-| Robô da frota | Montagem | Classe (5.4) | Revela o defeito de |
-|---|---|---|---|
-| Carrinho diferencial | tanque: 2 comuns + 2 bobas | diferencial | — |
-| Plataforma 4×4 | retângulo: 4 comuns | derrapante | — |
-| Carro com direção | retângulo: 2 direcionais na frente + 2 comuns atrás | carro | — |
-| Esteira de carga | tanque: 2 esteiras | derrapante | — |
-| Empilhadeira | triciclo: direcional na frente + 2 bobas atrás | puxado | Cérebro 2 |
-| Omni de 3 rodas | disco: 3 omni | holonômico | Cérebro 4 |
-| Mecanum 4×4 | retângulo: 4 mecanum | holonômico | Cérebro 4 |
-
-### 5.3 Galpão, planejador e seguidor (tecnologia madura, não é o que se testa)
-
-- **Mapa:** galpão de ~8 × 6 m, fileiras de prateleiras (retângulos) formando **corredores de
-  1,1 a 1,4 m**. Docas de saída e estações de destino marcadas no chão.
-- **Missões** (6 a 8, com nome, ex.: "Doca 1 → Estação C"). Pelo menos **duas começam de costas
-  para o destino** (exigem meia-volta) e uma passa por **corredor estreito**. As que começam de
-  costas devem ser minoria.
-- **Variação:** cada corrida sorteia um pequeno deslocamento na posição e no ângulo de saída
-  (±5 cm, ±5°), para "rodar de novo" não dar sempre exatamente o mesmo.
-- **Planejador:** A* numa grade de 5 cm com obstáculos inflados pelo raio do robô + 8 cm de
-  folga; depois encurtar por linha de visada (*string pulling*). A rota é desenhada na tela.
-- **Seguidor:** *pure pursuit*, ponto-alvo ~0,5 m à frente na rota. Velocidade desejada menor
-  perto do destino e em curvas fechadas.
-
-### 5.4 Piloto especialista (gera os exemplos para os cérebros imitarem)
-
-Controlador cinemático que conhece o corpo. Recebe o ponto-alvo no referencial do robô (direção
-`(tx, ty)`, erro de direção `alpha`) e a velocidade desejada, e escolhe o modo pela classe:
-
-| Classe | Como identificar | Comando de corpo |
-|---|---|---|
-| **Holonômico** | nenhuma roda de eixo fixo (comum/esteira) e nenhuma direcional | `v = vel·(tx,ty)`; `om = k·alpha` (vira aos poucos para a direção do movimento) |
-| **Diferencial / derrapante** | tem roda de eixo fixo, nenhuma direcional | `vx = vel·max(0, cos alpha)²`; `vy = 0`; `om = k·alpha` (gira no lugar quando muito desalinhado) |
-| **Carro** | tem direcional **e** roda de eixo fixo | *pure pursuit*: `vx = vel`, curvatura `2·sen(alpha)/L`, `om = vx·curvatura`; ré curta se `alpha` passar de ~100° |
-| **Puxado** | tem direcional e **nenhuma** roda de eixo fixo | a direcional aponta para o alvo e puxa; o resto segue como reboque |
-
-Cinemática inversa: para cada roda com motor, `c = v + om × r`; comando `= (c·e)/gain/VMAX`. Roda
-direcional: esterço = ângulo de `c` relativo à roda, dobrado para ±90° (trocando o sinal da
-velocidade) e limitado a ±0,6 rad; velocidade `= |c|·sinal`. Se algum comando passar de 1 em
-módulo, escalar todos juntos.
-
-### 5.5 Os cérebros (a tecnologia emergente)
-
-Uma única rede **condicionada ao corpo**: recebe a descrição de cada roda e o estado da missão, e
-devolve o comando de cada roda. Os mesmos pesos pilotam 2, 3 ou 4 rodas. Linha de pesquisa de
-controle entre corpos (*cross-embodiment*): *One Policy to Control Them All* (Huang et al., 2020),
-*MetaMorph* (Gupta et al., 2022), Open X-Embodiment, π0, GR00T.
-
-**Formato** (treina em segundos, sem PyTorch):
-
-```
-psi(roda)   = [1, características da roda, tanh(B·roda + c)]                          # ~37
-phi(estado) = [1, características do estado, média dos psi do corpo, tanh(A·estado + b)]  # ~90
-comando_i   = phi(estado)ᵀ · W · psi(roda_i)      # velocidade da roda i
-esterco_i   = phi(estado)ᵀ · V · psi(roda_i)      # esterço da roda i (usado se direcional)
-```
-
-`A, b, B, c` são aleatórios e fixos (gerados com semente, salvos com o modelo). Só `W` e `V` são
-aprendidos, por **mínimos quadrados com regularização** (ridge): cada exemplo vira o vetor
-`phi ⊗ psi_i`; acumular `XᵀX` e `Xᵀy` em lotes (dimensão ~3.300, cabe na memória) e resolver.
-É uma rede neural de camada aleatória: é honesto chamar de rede neural.
-
-- **Características da roda:** posição (x, y)/0,3; cos e sen do ângulo; direção de tração
-  (ex, ey); ganho; braço de torque `(x·ey − y·ex)/0,3`; escorrega de lado; tem motor; vira;
-  comprimento de contato/0,3; esterço atual; velocidade atual.
-- **Características do estado:** direção do ponto-alvo no referencial do robô; erro de direção
-  (sen, cos); velocidade desejada; velocidade atual (frente, lado, giro).
-- **Dados:** rodar o especialista em muitos corpos sorteados (a frota + variações aleatórias de
-  rodas e posições) e missões. **Executar a ação com ruído e gravar a ação limpa** do especialista,
-  para o cérebro aprender a se recuperar. Se der tempo, uma rodada de DAgger.
-- **Suavidade:** se o movimento sair tremido, aplicar um filtro passa-baixa no comando
-  (`cmd = 0.7·anterior + 0.3·novo`) igual para os 4 cérebros. Isso é parte normal de qualquer
-  controlador embarcado.
-
-**Os 4 cérebros** (na interface, só "Cérebro 1, 2, 3, 4"; os defeitos só aparecem no painel):
-
-| Cérebro | Treino | Defeito esperado |
-|---|---|---|
-| **1** | todos os corpos e situações | nenhum relevante: deve cumprir a regra |
-| **2** | nunca viu corpos **puxados** | falha na Empilhadeira, que parece um carro comum |
-| **3** | só viu o alvo **à frente** (erro de direção < 90°) | falha nas missões que começam de costas |
-| **4** | nunca viu corpos **holonômicos** | deriva de lado no Omni e no Mecanum |
-
-**Os defeitos precisam ser medidos.** Ver o teste de aceitação da fase 3. Se um defeito não
-aparecer, trocar a lacuna; se o cérebro 1 não cumprir a regra, mais dados ou DAgger.
-
-### 5.6 O site
-
-1. **Entrada:** apelido + número de participante (1 a 6) + o texto do papel e da regra da
-   fábrica (3).
-2. **Para cada cérebro** (indicador "cérebro 2 de 4", tempo sugerido ~5 min):
-   - **Bancada manual:** escolher robô da frota e missão; rodar; ver a rota planejada, o rastro e
-     o resultado (chegou / bateu / tempo esgotado). Repetir à vontade. Lista das corridas feitas
-     com este cérebro.
-   - **Relatório automático:** botão "rodar avaliação" → 40 corridas sorteadas, rodadas sem
-     desenhar, com barra de progresso → taxa de sucesso, tabela por robô e por missão, 3 piores
-     corridas com replay.
-   - **Decisão:** libero / não libero, confiança 1 a 5, por quê. Só segue com tudo preenchido.
-3. **Questionário** (3).
-4. **Envio** para a planilha; tela de obrigado. Guardar também em `localStorage` e oferecer
-   "baixar minhas respostas" como reserva.
-
-Visual: parecer um galpão. Prateleiras com caixas, faixas no chão, docas, robô em escala.
-Animação em tempo real com 1×/2×/4×. Notebook é obrigatório; celular, desejável.
-
-### 5.7 Painel do apresentador (`painel.html`)
-
-Lê as respostas e mostra, para os 20 minutos de conversa:
-
-- a **verdade** de cada cérebro (defeito, robôs e missões em que falha, taxa medida);
-- por cérebro: quantos liberaram na bancada e quantos no relatório;
-- **acerto por modo** e **confiança média nas decisões erradas por modo** (H1, H2);
-- se as pessoas que reprovaram tinham visto uma falha antes (H3);
-- contagem de "quem deveria assinar" (H4) e as respostas abertas.
-
-### 5.8 Coleta das respostas (Google Apps Script)
-
-O site faz `POST` com `mode: 'no-cors'` e `Content-Type: text/plain`; o painel faz `GET`. Criar
-uma Planilha Google → Extensões → Apps Script → colar → Implantar como App da Web (executar como
-você; acesso: qualquer pessoa) → copiar a URL `/exec` para `docs/config.js`.
-
-```js
-function doPost(e) {
-  const sh = sheet_();
-  if (sh.getLastRow() === 0) sh.appendRow(['quando', 'json']);
-  sh.appendRow([new Date(), e.postData.contents]);
-  return ContentService.createTextOutput('ok');
-}
-function doGet() {
-  const rows = sheet_().getDataRange().getValues().slice(1).map(r => JSON.parse(r[1]));
-  return ContentService.createTextOutput(JSON.stringify(rows))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-function sheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  return ss.getSheetByName('respostas') || ss.insertSheet('respostas');
-}
-```
-
-### 5.9 Publicação
-
-Repositório público, site em `/docs`; GitHub → Settings → Pages → *Deploy from a branch*, `main`,
-`/docs`. Módulos ES não carregam por `file://`: testar sempre pelo servidor local.
-
----
-
-## 6. Começar do zero ou reaproveitar
-
-**Decisão: repositório novo, começando do zero.** Quase tudo da versão anterior muda: o mundo
-(arena → galpão), o planejador (campo de forças → A*), o cérebro (estratégias evolutivas →
-imitação), o fluxo do site (montar e palpitar → banca com dois modos). Adaptar custaria mais do
-que reescrever e arrastaria decisões que deram errado.
-
-Se o zip `um-cerebro-muitos-corpos.zip` estiver à mão, dá para **copiar como ponto de partida**:
-
-| Arquivo antigo | O que fazer |
+| | Resultado |
 |---|---|
-| `docs/core/physics.js` | **Reaproveitar** a física; trocar obstáculos e colisão para retângulos, `MAX_STEPS` para 600, remover lidar, cenários e percursos |
-| `docs/core/parts.js` | **Reaproveitar** `PARTS`, `MOTORS`, `BASES`, `buildBody`, `makeWheel`; remover `randomTrainingBody` e `novidades`; acrescentar a frota (5.2) |
-| `docs/core/draw.js` | **Reaproveitar** `drawWheel`, `drawBase`, `drawRobot`; reescrever o desenho da arena como galpão |
-| `planner.js`, `policy.js`, `episode.js`, `train/*`, `app.js`, `index.html` | **Descartar** |
+| Acerto na bancada (testar na mão) | 9 de 12 |
+| Acerto com o relatório automático | 8 de 12 (empate, com 6 pessoas) |
+| Erros | 7, **todos** liberando cérebro com defeito; ninguém reprovou o cérebro bom |
+| Erros cometidos **depois de ver a falha** | **6 de 7** |
+| Cérebro 3 (relatório mostrava 90 a 95% de sucesso) | liberado por 4 de 6 |
+| Cérebro 4 (relatório mostrava 70 a 75%) | liberado por 1 de 6 |
 
-Sem o zip, a seção 5 tem tudo para reescrever.
+As justificativas dos erros explicam o padrão: *"acho que é seguro exceto empilhadeira"*,
+*"definitivamente devem ser excluídos o Omni de 3 rodas e o Mecanum 4×4"*, *"problema estaria se
+tivesse que se mover de costas, mas isso poderia ser resolvido"*. **O problema não era achar a
+falha; a ferramenta achava. As pessoas queriam liberar com restrições, e o site só aceitava sim
+ou não.**
+
+Pedidos e críticas registrados nas respostas abertas, que viram requisitos (seção 4):
+
+- **Gravidade importa:** *"os erros do omni foram compreensíveis, o do mecanum é de outro
+  nível"*; *"o quão desastroso e a frequência com que o problema acontece"*.
+- **Ver qualquer caso**, não só os 3 piores; *"rodar tudo automático mas permitir auditoria
+  humana"*; *"vários rastros visíveis de uma vez"*.
+- **O virtual não basta:** *"se passar em todos no mundo virtual, aí faz uma nova bateria de
+  testes físicos"*.
+- **Assinatura em camadas:** *"um nível básico, de agência certificadora independente, outorgado
+  pelo governo; a empresa deve ter seu próprio nível de exigência; e a fábrica vai ver no seu
+  caso específico"*.
+- **Variar o robô mantendo a missão** foi mais útil do que o contrário.
+- Sugestão da turma: **adicionar imprevisibilidades**.
+- Quem deveria assinar (questão 4): fábrica que vai usar 3, governo 1, certificadora 1, empresa
+  do cérebro 1.
+
+Com 6 pessoas, falar em "o que apareceu", não em "o que ficou provado".
+
+### 1.3 A utilidade real da ferramenta
+
+Teste físico de robô é caro, lento e perigoso; simulação é barata. A ferramenta não decide
+aprovado ou reprovado. Ela entrega:
+
+1. **Uma licença com limites:** "este cérebro está liberado para estes robôs, nestas missões,
+   até estes níveis de perturbação". É o que a turma tentou fazer de cabeça. Em carro autônomo,
+   o conceito equivalente é o **ODD** (domínio de projeto operacional): o conjunto de condições
+   em que o sistema foi validado para operar.
+2. **A lista de testes físicos:** os casos na fronteira, para gastar teste real só onde importa.
+3. **O que falta treinar:** cada bloqueio diz qual situação o cérebro não domina.
 
 ---
 
-## 7. Plano de implementação
+## 2. O que o projeto é
 
-Estimativa total: **12 a 15 horas de trabalho**, cabendo no prazo com folga pequena. As fases
-estão na ordem em que dependem umas das outras. Cada uma termina com um teste de aceitação.
+Uma página, `docs/licenca.html`, onde se escolhe um cérebro e se obtém a licença de operação
+dele, com a evidência por trás de cada linha. Seis capacidades:
 
-### Fase 0 — Preparar (30 min)
+1. **Matriz de cobertura:** robô × missão, em grade colorida. Cada célula abre o replay de
+   qualquer corrida, ou todos os rastros da célula sobrepostos.
+2. **Piloto de referência:** cada célula é comparada com o especialista (o controlador
+   cinemático que gerou os dados de treino). Isso separa **defeito do cérebro** de **limite do
+   corpo ou da condição** (seção 3.2).
+3. **Imprevisibilidades com varredura:** saída em qualquer direção, empurrão, ruído de sensor,
+   atraso de comando, obstáculo surgindo. Para cada eixo, a ferramenta acha até onde o cérebro
+   aguenta.
+4. **Gravidade:** colisão forte, raspão, travou, quase-acidente. Risco = frequência × gravidade.
+5. **Licença em camadas:** certificadora (mínimo obrigatório), fabricante do cérebro (escopo
+   declarado) e fábrica usuária (frota e tolerância dela). A licença é a interseção, com as três
+   assinaturas, e sai impressa ou em PDF.
+6. **Ciclo de melhoria e comparação de versões:** a licença aponta o que falta treinar; o
+   cérebro é retreinado; a ferramenta compara a licença da versão nova com a antiga.
 
-- Criar o repositório `banca-homologacao-robos` com a estrutura da seção 8; este arquivo como
-  `CLAUDE.md`.
-- Copiar os arquivos reaproveitáveis (seção 6), se houver.
-- Criar a Planilha Google e implantar o Apps Script (5.8); colar a URL em `docs/config.js`.
-- **Aceite:** `python -m http.server` serve uma página em branco sem erro no console; um `POST` de
-  teste aparece na planilha.
+Mais um montador de robôs fora da frota, com cálculo ao vivo (etapa 8).
 
-### Fase 1 — Galpão, física e rota (2 a 3 h)
+### Tecnologia emergente, e por que não dá com tecnologia madura
 
-- `physics.js` com colisão em retângulos; `warehouse.js` com o mapa e as missões;
-  `planner.js` com A*, encurtamento e *pure pursuit*.
-- `docs/sandbox.html`: página de depuração que desenha o galpão, a rota de cada missão e um
-  **robô ideal** (segue o ponto-alvo sem física).
-- **Aceite:** o robô ideal chega em **100% das missões**; as rotas passam pelos corredores, não
-  "por fora"; nenhuma rota encosta em prateleira.
+O que se licencia é uma **política de controle aprendida e condicionada ao corpo** (a mesma rede
+pilota qualquer robô a partir da descrição das rodas; linha *cross-embodiment*: *One Policy to
+Control Them All*, *MetaMorph*, Open X-Embodiment, π0, GR00T). Na pilha madura, com controle
+escrito à mão para cada robô, a homologação é feita módulo por módulo, e cada falha tem um
+responsável. Com uma rede que não se decompõe, só resta mapear empiricamente onde ela é
+confiável: é isso que a ferramenta faz. O planejador A* e o especialista são maduros e servem de
+instrumento, não de objeto.
 
-### Fase 2 — Especialista e frota (2 h)
+---
 
-- `parts.js` com a frota; `expert.js` com as quatro classes e a cinemática inversa.
-- `train/avaliar.mjs` aceitando `--piloto especialista`: roda cada robô da frota em cada missão,
-  5 vezes, e imprime chegou / bateu / tempo e uma **medida de suavidade** (variação média do
-  comando entre passos).
-- No sandbox, poder escolher robô e piloto e assistir.
-- **Aceite:** o especialista chega em **≥ 95% de cada combinação robô × missão** da frota, e o
-  movimento parece intencional a olho (sem zigue-zague, sem girar à toa).
+## 3. Decisões técnicas já tomadas (e testadas)
 
-### Fase 3 — Os 4 cérebros (2 a 3 h)
+### 3.1 Os cérebros
 
-- `brain.js` (features + forward); `train/gerar_dados.mjs` (especialista + ruído, grava
-  `Float32`); `train/ajustar.py` (ridge → `docs/model/brains.json`).
-- Gerar um conjunto completo e filtrar as lacunas para os cérebros 2, 3 e 4.
-- `avaliar.mjs --piloto cerebro1..4` gera a **tabela de verdade** e a grava no modelo.
-- **Aceite:**
-  1. Cérebro 1 cumpre a regra (nenhuma combinação da frota abaixo de 90%) e tem suavidade
-     comparável à do especialista.
-  2. Cérebros 2, 3 e 4 ficam **≥ 90% fora da sua lacuna** e **≤ 50% dentro dela**.
-  3. Rodando o "Carrinho diferencial" na primeira missão, os 4 cérebros parecem igualmente
-     competentes. Se algum defeito for óbvio de cara, o experimento perde a graça.
+- **Os 4 cérebros do experimento ficam congelados** e viram o **gabarito** da ferramenta: cada
+  um tem uma lacuna de treino conhecida, e o licenciador tem que reencontrá-la. Se não
+  reencontrar, o erro é da ferramenta. Isso é demonstração de que ela funciona.
 
-### Fase 4 — Site da banca (3 a 4 h)
+  | Cérebro | Lacuna plantada no treino | O que a licença tem que bloquear |
+  |---|---|---|
+  | 1 | nenhuma | nada na frota nominal |
+  | 2 | nunca viu robôs puxados por roda direcional | Empilhadeira, todas as missões |
+  | 3 | nunca viu o alvo a mais de 60° (sem meia-volta) | Carro e Empilhadeira em m6 e m7 |
+  | 4 | nunca viu robôs holonômicos | Omni de 3 rodas e Mecanum 4×4 |
 
-- `index.html` + `app.js` + `draw.js`: entrada, distribuição pelo número de participante,
-  bancada manual, relatório automático com replay, decisão, questionário, envio.
-- **Aceite:** abrir o site como participante 1 e como participante 2 em duas abas, completar os
-  dois do começo ao fim em menos de 25 minutos cada, e ver as duas respostas na planilha com
-  todos os campos.
+- **Um cérebro novo: `cerebro3v2`**, para demonstrar o ciclo (etapa 7). É o cérebro 3
+  retreinado **com os dados que a licença disse que faltavam** (alvo atrás, sem o corte de 60°)
+  e com **atraso de comando** nos dados. Vai num arquivo separado,
+  `docs/model/cerebro3v2.json`, para não tocar em `brains.json`.
+- **O especialista é o piloto de referência.** No mundo real não há especialista perfeito; na
+  apresentação ele é "o controlador de referência" (um controlador clássico, ou a versão
+  certificada anterior), que é como se faz teste de regressão.
 
-### Fase 5 — Painel, README e publicação (1 a 2 h)
+### 3.2 Classificação de cada célula
 
-- `painel.html`: lê o `GET` do Apps Script e mostra o que pede a seção 5.7.
-- `README.md` a partir do rascunho da seção 9, com as minhas palavras.
-- Publicar no GitHub Pages e repetir o teste da fase 4 **pelo link público**, de outro
-  computador ou do celular.
-- **Aceite:** o link abre fora da minha máquina; o painel mostra as respostas de teste. Apagar as
-  respostas de teste da planilha antes da aula.
+Para cada célula (robô × missão × condição), com `b` = taxa de sucesso do cérebro e `e` = taxa
+do especialista, nas mesmas sementes:
 
-### Se o tempo acabar, cortar nesta ordem
+| Classe | Regra | Cor | Na licença |
+|---|---|---|---|
+| **Liberado** | `b ≥ tol` e nenhuma colisão grave | verde | dentro |
+| **Testar fisicamente** | liberado, mas com falha leve, quase-acidente, ou é o último nível de varredura antes do limite | amarelo | dentro, na lista de testes físicos |
+| **Defeito do cérebro** | `b < tol` e `e ≥ tol` | vermelho | bloqueado, e vai para "o que falta treinar" |
+| **Limite físico** | `e < tol` | cinza | fora do envelope; não conta contra o cérebro |
 
-1. Painel → usar a própria planilha na conversa.
-2. Montador livre de robôs → só a frota.
-3. Variação de motor lento, caixa caída, polimento visual.
-4. DAgger → só a injeção de ruído.
+`tol` vem da camada mais exigente (seção 4.5); padrão 0,9.
 
-**Não cortar:** o relatório automático (sem ele não há comparação) e a medição dos defeitos.
+### 3.3 Imprevisibilidades: o que funciona e o que não funciona neste simulador
 
-### Riscos e o que fazer
+Testado em 22/11 numa cópia do repositório (2 repetições por combinação, números indicativos):
 
-| Risco | Sinal | Saída |
+- **Física (piso, carga, motor) não serve.** Com atrito de 0,9 a 0,25, carga 2,5× ou motor
+  lento, especialista e cérebro 1 chegam em 100%. A **carga não tem efeito nenhum, nem 10×**: na
+  física atual a massa se cancela (todos os impulsos são proporcionais a ela). Só quebra em
+  valores absurdos (atrito 0,03, motor com 2 s de atraso), e aí o especialista quebra igual.
+  Limitar a força do motor para a carga importar **quebrou a frota em condições normais**
+  (plataforma e esteira derrapam para virar e precisam de muita força). **Não tentar de novo.**
+- **Perturbações de percepção e de situação funcionam**, porque testam o que o cérebro viu no
+  treino:
+
+  | Perturbação | Especialista | Cérebro 1 | Cérebro 3 |
+  |---|---|---|---|
+  | nominal | 100% | 100% | 92% |
+  | saída virada em qualquer direção | 98% | 98% | 85% (carro 43%) |
+  | atraso de 0,25 s nos comandos | 98% | 94% (diferencial 57%) | 84% |
+  | empurrão lateral no meio do caminho | 100% | 100% | 92% |
+  | ruído de ±25° na direção do alvo | 100% | 100% | 92% |
+
+  O cérebro 1, que parece perfeito no nominal, tem um ponto fraco próprio: **atraso**. A saída
+  em qualquer direção expõe o cérebro 3 muito mais do que as missões fixas.
+- **Robôs fora da frota:** o retângulo com 1 direcional + 3 bobas e o disco com 2 omni + 1 boba
+  ficam em 0% **também com o especialista**: são limite físico, e a ferramenta tem que
+  classificá-los em cinza, não em vermelho.
+
+### 3.4 Como implementar cada perturbação (sem tocar na física)
+
+Tudo na camada de corrida (`episode.js`), como opções de `Run`, sorteadas com um gerador
+derivado da semente da corrida (`mulberry32(seed * 7 + 3)`), para o replay repetir igual:
+
+| Perturbação | Parâmetro | Implementação | Níveis da varredura |
+|---|---|---|---|
+| Saída em qualquer direção | `giro` (graus) | soma `U(−giro, +giro)` ao ângulo de saída da missão antes do `jitterStart` | 0, 45, 90, 135, 180 |
+| Empurrão | `empurrao` (m/s) | no passo 60 (3 s), soma essa velocidade na lateral do robô e 1,5·(empurrao/0,6) rad/s de giro | 0, 0,3, 0,6, 0,9, 1,2 |
+| Ruído de sensor | `ruido` (graus) | a cada passo, gira a direção do ponto-alvo (`tx, ty, alpha`) por `U(−ruido, +ruido)` antes de entregar ao piloto | 0, 10, 20, 30, 45 |
+| Atraso de comando | `atraso` (s) | fila de `atraso/DT` comandos; a ação executada é a de N passos antes; comandos zero no começo | 0, 0,1, 0,2, 0,3, 0,5 |
+| Obstáculo surgindo | `obstaculo` (sim/não) | no passo 80, um círculo de 0,25 m na rota ~1,2 m à frente; troca `world.map` por uma cópia do galpão com o obstáculo, replaneja do ponto atual e troca o `Follower`. Sem rota possível = `bloqueado` (limite) | só sim/não |
+
+O especialista recebe as mesmas perturbações: é isso que torna a comparação justa.
+
+### 3.5 Gravidade
+
+Medição aditiva em `World` (não muda o resultado da corrida):
+
+- `impact`: velocidade do robô no passo em que bateu (`hypot(vx, vy)`).
+- `minClear`: menor folga (`clearance − colR`) ao longo da corrida.
+
+| Gravidade | Regra |
+|---|---|
+| **Grave** | bateu com `impact ≥ 0,3 m/s` |
+| **Raspão** | bateu com `impact < 0,3 m/s` |
+| **Travou** | tempo esgotado (não chegou, não bateu) |
+| **Quase-acidente** | chegou, mas com `minClear < 0,03 m` |
+
+Pesos para o risco: grave 10, raspão 3, travou 2, quase-acidente 1. Risco da célula = média dos
+pesos sobre as corridas.
+
+### 3.6 Pré-cálculo, para a demonstração não esperar
+
+A matriz completa é grande: 6 pilotos (especialista, cérebros 1 a 4, 3v2) × (nominal + 4 eixos ×
+4 níveis + obstáculo = 18 condições) × 49 células × 6 repetições ≈ 32 mil corridas. Em Node isso
+leva uns 10 a 20 minutos; no navegador, ao vivo, seria inviável.
+
+- `train/licenciar.mjs` roda tudo e grava **`docs/model/licencas.json`** com, por piloto e
+  condição e célula: `n`, `ok`, contagem por gravidade, `minClear` mínimo, `risco`, e a semente
+  de cada corrida que falhou (para o replay).
+- A página lê esse arquivo e abre em segundos. O replay roda ao vivo a partir da semente e das
+  opções: mesma semente, mesma corrida.
+- **Determinismo:** `Math.tanh`/`cos` podem diferir minimamente entre navegadores. Se o replay
+  de uma corrida pré-calculada terminar diferente, mostrar o resultado do replay com um aviso
+  discreto ("este navegador reproduziu com outro resultado"). Não esconder.
+- Corridas ao vivo (montador, etapa 8) rodam num **Web Worker** para não travar a aba.
+
+---
+
+## 4. Especificação da página `docs/licenca.html`
+
+Página nova. `docs/index.html` (o experimento) continua igual, só ganha no topo um link "Projeto
+final: licenciador →". `licenca.html` ganha um link de volta "O experimento que originou isto".
+
+### 4.1 Layout
+
+- **Topo:** seletor de cérebro (1, 2, 3, 4, 3v2), seletor de condição (nominal / cada eixo com
+  seu nível / obstáculo) e o resumo em uma linha ("Liberado para 6 de 7 robôs em todas as
+  missões; bloqueado: Empilhadeira").
+- **Centro:** a grade robô × missão. Linhas = robôs, colunas = missões. Cor pela classe (3.2);
+  ícone pela pior gravidade; tooltip com `b`, `e`, risco. **Robôs nas linhas** porque a turma
+  achou mais útil comparar robôs na mesma missão.
+- **Lateral:** painel da célula clicada: tabela das corridas (semente, resultado, gravidade,
+  tempo), botão de replay de qualquer uma, botão "todos os rastros", e a mesma célula com o
+  especialista lado a lado.
+- **Abaixo:** o cartão da licença (4.4) e as camadas (4.5).
+- Legenda sempre visível. Funciona em notebook e projetor (1366×768 no mínimo); celular é
+  desejável.
+
+### 4.2 Replay e rastros
+
+- Replay: canvas do galpão com o robô andando em tempo real (1×/2×/4×), rota planejada, rastro,
+  e a perturbação visível (seta no empurrão, obstáculo aparecendo, ponto-alvo tremendo no ruído,
+  rótulo "atraso 0,2 s").
+- Todos os rastros da célula: todas as corridas daquela célula desenhadas juntas, cor por
+  resultado. É a "auditoria humana" pedida pela turma.
+
+### 4.3 Varredura
+
+Para cada eixo de imprevisibilidade, um gráfico simples (barras ou linha) com o nível no eixo x e
+a fração de células liberadas no y, cérebro e especialista juntos. O **limite** é o maior nível
+em que o cérebro mantém todas as células onde o especialista se mantém. Vira uma linha da
+licença: "liberado até atraso de 0,1 s".
+
+### 4.4 O cartão da licença
+
+Gerado, nunca escrito à mão:
+
+- **Liberado para:** robôs × missões (agrupado quando possível: "todos os robôs, todas as
+  missões, exceto...").
+- **Limites de operação:** um por eixo (saída até X°, ruído até Y°, atraso até Z s, empurrão até
+  W m/s, obstáculo surgindo: sim ou não).
+- **Bloqueado (defeito do cérebro):** cada célula vermelha, com a gravidade.
+- **Fora do envelope (limite físico):** cada célula cinza, explicando que nenhum piloto conseguiu.
+- **Testes físicos obrigatórios:** as células amarelas, ordenadas por risco.
+- **O que falta treinar:** cada bloqueio traduzido em situação ("robôs puxados por roda
+  direcional", "meia-volta com carro e empilhadeira", "atraso acima de 0,1 s").
+- **Assinaturas** (4.5), data, versão do cérebro e versão da ferramenta.
+- Botão **Imprimir / salvar PDF** (`window.print()` com CSS de impressão que mostra só o cartão).
+
+### 4.5 As camadas
+
+Três painéis lado a lado, cada um com o que aquela parte decide e um botão "assinar" (nome +
+data, guardado no `localStorage`; exportável em JSON):
+
+| Camada | Decide | Padrão |
 |---|---|---|
-| O cérebro 1 não fica suave | treme ou zigue-zagueia | filtro passa-baixa no comando; mais dados com ruído; DAgger |
-| Um defeito não aparece | o cérebro passa mesmo dentro da lacuna | lacuna mais radical (ex.: tirar também as direcionais do treino do cérebro 2) |
-| Um defeito é óbvio demais | falha no primeiro robô que todo mundo testa | lacuna mais estreita, ou missão que revela o defeito menos comum |
-| Robô do especialista falha numa combinação | < 95% | ajustar folga do A* ou a velocidade em curva; se o corpo for fisicamente ruim, tirar da frota |
-| Apps Script não recebe | planilha vazia | conferir "qualquer pessoa" na implantação; usar o "baixar minhas respostas" como reserva |
+| **Certificadora** (outorgada pelo governo) | o mínimo: tolerância, gravidade proibida, níveis mínimos que todo cérebro tem que aguentar | `tol` 0,9; nenhuma colisão grave; ruído ≥ 10° e atraso ≥ 0,1 s |
+| **Fabricante do cérebro** | o escopo declarado: quais tipos de robô o cérebro se propõe a pilotar | todos |
+| **Fábrica usuária** | a frota e as missões que ela usa de verdade, e se quer ser mais exigente | toda a frota, todas as missões |
+
+**A licença é a interseção.** Isso permite os dois casos que a turma levantou:
+
+- **Limitação declarada não é defeito.** Se o fabricante do cérebro 4 declara "não pilota
+  holonômicos", omni e mecanum saem do escopo, e o resto pode ser licenciado. A mesma falha,
+  escondida, é reprovação; declarada, é escopo.
+- **A fábrica sem empilhadeira** pode licenciar o cérebro 2 para a frota dela.
+
+O cartão mostra de onde veio cada restrição (certificadora, fabricante ou fábrica).
+
+### 4.6 Comparação de versões
+
+Seletor "comparar com": mostra a grade como diferença entre duas versões (verde = passou a
+liberar, vermelho = regrediu, cinza = igual) e as duas licenças lado a lado.
+
+---
+
+## 5. Roteiro da demonstração (o professor exige que seja demonstrável)
+
+**Definição de demonstrável:** o link abre em qualquer notebook sem instalar nada; a primeira
+licença aparece em menos de 5 segundos; o roteiro abaixo roda inteiro em até 6 minutos; existe
+um vídeo de reserva caso a internet da sala falhe.
+
+A apresentação final tem 15 minutos: o experimento como ficou, o registro do que mudou, a
+resposta à pergunta, e o que faria com mais um semestre. A demonstração ocupa uns 6.
+
+1. **Gancho (30 s):** "6 dos 7 erros da banca foram liberar um cérebro com defeito depois de ver
+   o defeito. As pessoas queriam liberar com restrição. Esta ferramenta faz isso."
+2. **Cérebro 1, nominal (30 s):** tudo verde. "Este passa."
+3. **Cérebro 2 (1 min):** a linha da Empilhadeira em vermelho. Clica: o especialista consegue,
+   o cérebro não. Replay. "Defeito do cérebro, não do robô."
+4. **Limite físico (30 s):** no montador, retângulo com 1 direcional + 3 bobas: cinza. "Ninguém
+   pilota isto; não é culpa do cérebro." *(Se a etapa 8 não ficar pronta, mostrar o caso pelo
+   pré-cálculo.)*
+5. **Varredura (1 min):** cérebro 1, eixo de atraso. "O cérebro que passava em tudo aguenta até
+   0,1 s de atraso; a licença diz isso."
+6. **Camadas (1 min):** fábrica desmarca a Empilhadeira → o cérebro 2 é licenciado para ela.
+   Fabricante do cérebro 4 declara "não holonômicos" → licenciável.
+7. **Ciclo (1 min):** cérebro 3 → "o que falta treinar: meia-volta" → compara com o 3v2.
+8. **Imprime a licença (30 s).**
+
+---
+
+## 6. Etapas de implementação
+
+### 6.1 Progresso
+
+O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marcar e somar.
+
+| | Etapa | Peso | Tempo | Ao terminar, dá para demonstrar... |
+|---|---|---|---|---|
+| ☑ | 0. Preparar | 2% | 30 min | — |
+| ☐ | 1. Medição: gravidade, perturbações, pré-cálculo | 15% | 3 h | tabelas no terminal |
+| ☐ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
+| ☐ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
+| ☐ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
+| ☐ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
+| ☐ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
+| ☐ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
+| ☐ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
+| ☐ | 9. Fechamento: README, REGISTRO, roteiro, vídeo | 5% | 1,5 h | entrega final |
+| | **Total** | 100% | ~18 a 22 h | |
+
+O **obstáculo surgindo** é parte da etapa 4, mas é o item mais caro (replanejamento). Se ele
+travar, segue sem ele e volta só se sobrar tempo.
+
+### 6.2 Se o tempo acabar, cortar nesta ordem
+
+1. Obstáculo surgindo (etapa 4).
+2. Montador e cálculo ao vivo (etapa 8): o caso do limite físico aparece pelo pré-cálculo.
+3. Comparação de versões (etapa 7): fica só "o que falta treinar" na licença.
+4. Camadas viram só a camada da fábrica (etapa 6).
+
+**Nunca cortar:** etapas 1, 2, 3 e 9. A partir da etapa 3 o projeto está sempre apresentável.
+
+### Etapa 0 — Preparar (30 min)
+
+- Criar o branch `licenciador`. Guardar o `CLAUDE.md` antigo como `docs/historico/CLAUDE-experimento.md`.
+- **Dados da turma:** o CSV das respostas tem apelidos de colegas e texto livre, e o repositório é
+  público. Antes de versionar, trocar apelidos por P1 a P6 e salvar em `dados/respostas-turma.csv`.
+- Rodar `node train/avaliar.mjs --piloto cerebros --reps 20` e guardar a saída em
+  `dados/verdade-antes.txt` (base para a conferência de regressão).
+- **Aceite:** branch criado; CSV anonimizado; saída de referência guardada.
+
+### Etapa 1 — Medição: gravidade, perturbações e pré-cálculo (3 h)
+
+- `physics.js`: `World` passa a registrar `impact` e `minClear` (3.5). Só medição.
+- `episode.js`: `Run` aceita um último argumento `opts = { giro, empurrao, ruido, atraso, obstaculo }`
+  (3.4); sem `opts`, comportamento idêntico ao atual. `result()` devolve também `impact`,
+  `minClear` e `gravidade`.
+- Novo `docs/core/licenca.js`: classificação de célula (3.2), risco (3.5), limite de varredura
+  (4.3), montagem do cartão (4.4). Funções puras, usadas pela página e pelo Node.
+- Novo `train/licenciar.mjs`: roda a matriz (3.6) e grava `docs/model/licencas.json`. Aceita
+  `--pilotos`, `--reps`, `--condicoes` para rodar parcial durante o desenvolvimento. Imprime, por
+  cérebro, a licença em texto.
+- **Aceite:**
+  1. A conferência de regressão (seção 0) dá igual a `dados/verdade-antes.txt`.
+  2. Nominal: a licença em texto de cada cérebro bloqueia **exatamente** o que a tabela da
+     seção 3.1 manda, e nada mais.
+  3. Com o montador via script, retângulo 1 direcional + 3 bobas sai como **limite físico** para
+     todos os cérebros.
+  4. A varredura de atraso mostra o cérebro 1 caindo antes do especialista (3.3).
+
+### Etapa 2 — Página da licença: grade, replay, cartão (3 a 4 h)
+
+- `docs/licenca.html` + `docs/licenca.js`, reaproveitando `style.css` e `draw.js`
+  (`viewFor`, `drawWarehouse`, `drawPath`, `drawTrail`, `drawRobotAt`).
+- Seletor de cérebro, grade nominal colorida (4.1), painel da célula com replay e todos os
+  rastros (4.2), cartão da licença nominal com impressão (4.4).
+- Links cruzados com `index.html`.
+- **Aceite:** abrir pelo servidor local; cada um dos 4 cérebros mostra a grade esperada; clicar
+  na Empilhadeira do cérebro 2 mostra especialista em verde e cérebro em vermelho, e o replay
+  termina como o pré-cálculo diz; imprimir gera uma página só com o cartão.
+
+### Etapa 3 — Publicar e ensaiar o mínimo (45 min)
+
+- Merge no `main` (ou Pages apontando para o branch), conferir o link público no celular e em
+  outro computador. Atualizar o link no README.
+- Gravar um vídeo de tela de 1 a 2 minutos dos passos 1 a 3 do roteiro (seção 5): é a reserva v1.
+- **Aceite:** link público abre fora da máquina do Matheus e mostra a licença em menos de 5 s.
+
+### Etapa 4 — Imprevisibilidades e varredura (2 a 3 h)
+
+- Seletor de condição na página; grade por condição; gráficos de varredura (4.3); linhas
+  "limites de operação" no cartão.
+- Replay mostrando a perturbação (4.2).
+- Obstáculo surgindo por último (ver 6.2).
+- **Aceite:** o cartão do cérebro 1 traz um limite de atraso menor que o do especialista; o do
+  cérebro 3 traz um limite de saída em qualquer direção; em toda condição, células onde o
+  especialista falha aparecem cinza, não vermelhas.
+
+### Etapa 5 — Gravidade e testes físicos (1 h)
+
+- Ícone de gravidade na grade; risco no tooltip e no painel; células amarelas; lista "testes
+  físicos obrigatórios" ordenada por risco no cartão.
+- **Aceite:** no cérebro 4, Mecanum aparece com colisões graves e Omni com gravidade menor (é a
+  distinção que a turma fez de cabeça); a lista de testes físicos do cérebro 1 não fica vazia nem
+  enorme (entre 3 e 15 itens).
+
+### Etapa 6 — Camadas e assinaturas (2 h)
+
+- Os três painéis (4.5), a interseção, a origem de cada restrição no cartão, assinatura com nome
+  e data, exportar JSON, e as assinaturas no impresso.
+- **Aceite:** desmarcar a Empilhadeira na camada da fábrica torna o cérebro 2 licenciável; o
+  fabricante do cérebro 4 declarar "não holonômicos" torna o cérebro 4 licenciável, com a
+  exclusão marcada como "declarada pelo fabricante"; aumentar a exigência da certificadora
+  encolhe todas as licenças.
+
+### Etapa 7 — Ciclo: cérebro 3v2 e comparação (1,5 h)
+
+- `gerar_dados.mjs`: opção `--atraso` (atraso de 0 a 0,3 s sorteado por episódio na ação
+  executada; o rótulo continua sendo a ação limpa do especialista) e saída em pasta separada.
+- `ajustar.py`: opções `--dados`, `--so` (ajustar um cérebro só) e `--saida`, gravando
+  `docs/model/cerebro3v2.json` **sem tocar em `brains.json`**. O 3v2 é ajustado **sem o corte de
+  60°**.
+- `pilots.js`: carregar o 3v2 do arquivo dele. Pré-calcular o 3v2 em `licencas.json`.
+- Comparação de versões na página (4.6).
+- **Aceite:** a licença do 3v2 libera Carro e Empilhadeira em m6 e m7; a comparação 3 → 3v2 não
+  mostra regressão em nenhuma célula nominal. Se o atraso não melhorar no 3v2, registrar isso no
+  README como achado ("dados de atraso sozinhos não ensinam a compensar atraso, porque o
+  especialista também não compensa") em vez de forçar.
+
+### Etapa 8 — Montador e cálculo ao vivo (2 a 3 h)
+
+- Montador de robô na página (bases e encaixes de `parts.js`); cálculo da licença do robô montado
+  ao vivo num Web Worker, só nas condições nominal e numa condição escolhida, com barra de
+  progresso.
+- **Aceite:** montar o retângulo 1 direcional + 3 bobas dá cinza em tudo para todos os cérebros;
+  montar o triciclo com direcional + 2 comuns dá verde no cérebro 1 e mostra diferença no
+  cérebro 3; a aba não trava durante o cálculo.
+
+### Etapa 9 — Fechamento (1,5 h)
+
+- **README.md** reescrito para o projeto: o que é; a pergunta; a tecnologia emergente; como usar;
+  o que o experimento mostrou (seção 1.2); limitações (física 2D, atrito "macio", carga sem
+  efeito, especialista como referência idealizada, 6 participantes); o que faria com mais um
+  semestre (seção 7).
+- **REGISTRO.md** (vale 1,0 e é separado do projeto, mas usa os mesmos dados): o que a turma fez
+  que eu não esperava (fatos da seção 1.2); o que mudei por causa disso (cada requisito da
+  seção 4 ligado à observação que o originou); o que decidi **não** mudar, e por quê; e a linha
+  final: a pergunta ficou mais clara, mais confusa ou mudou? *Rascunho do assistente, mas o
+  Matheus reescreve com as palavras dele.*
+- Ensaiar o roteiro da seção 5 cronometrado; gravar o vídeo de reserva final.
+- **Aceite:** README e REGISTRO no repositório; roteiro em menos de 6 minutos; vídeo salvo.
+
+---
+
+## 7. O que fica para "mais um semestre" (para a apresentação final)
+
+- Física com carga, motores e piso reais, para que piso escorregadio e carga virem eixos da
+  licença.
+- Robôs reais: usar a lista de testes físicos numa bancada de verdade e comparar com o previsto.
+- Busca automática de falhas (procurar ativamente a pior condição em vez de varrer uma grade).
+- Licença viva: reavaliar automaticamente a cada nova versão do cérebro.
+- Validar com quem homologa de verdade (certificadoras, indústria automotiva).
 
 ---
 
 ## 8. Estrutura de arquivos
 
 ```
-CLAUDE.md               este arquivo
-README.md
-REGISTRO.md             depois do teste
+CLAUDE.md                 este arquivo
+README.md                 reescrito na etapa 9
+REGISTRO.md               etapa 9
+dados/
+  respostas-turma.csv     anonimizado (etapa 0)
+  verdade-antes.txt       referência de regressão (etapa 0)
 docs/
-  index.html            o experimento (banca)
-  painel.html           painel do apresentador
-  sandbox.html          depuração (galpão, rotas, pilotos)
-  app.js, painel.js
-  config.js             URL do Apps Script
+  index.html, app.js      o experimento (congelado; só ganha um link)
+  licenca.html            o projeto (novo)
+  licenca.js              página do projeto (novo)
+  painel.html, painel.js  painel do experimento (congelado)
+  sandbox.html            depuração
+  style.css               compartilhado
   core/
-    parts.js            peças, bases, frota, montagem do corpo
-    physics.js          física (5.1), colisão com retângulos e círculos
-    warehouse.js        mapa do galpão e missões
-    planner.js          A*, encurtamento, pure pursuit
-    expert.js           piloto especialista (5.4)
-    brain.js            features + forward do cérebro (5.5)
-    draw.js             galpão, robôs, rota, rastro
+    physics.js            + impact, minClear (aditivo)
+    episode.js            + opts de perturbação (aditivo)
+    licenca.js            classificação, risco, varredura, cartão (novo)
+    worker.js             corridas ao vivo (etapa 8, novo)
+    parts.js, warehouse.js, planner.js, expert.js, brain.js, pilots.js, draw.js, banca.js
   model/
-    brains.json         4 cérebros + features aleatórias + tabela de verdade
+    brains.json           os 4 cérebros do experimento (congelado)
+    cerebro3v2.json       etapa 7 (novo)
+    licencas.json         pré-cálculo (novo)
+  historico/
+    CLAUDE-experimento.md
 train/
-  gerar_dados.mjs
-  ajustar.py
-  avaliar.mjs
+  avaliar.mjs             verdade do experimento
+  licenciar.mjs           pré-cálculo das licenças (novo)
+  gerar_dados.mjs         + --atraso, saída separada
+  ajustar.py              + --dados, --so, --saida
 extras/
   coletar-respostas.gs
 ```
-
----
-
-## 9. Rascunho do README (reescrever com as minhas palavras)
-
-**O que é.** Uma banca de homologação simulada. A pessoa avalia quatro "cérebros" de robô (redes
-neurais que pilotam qualquer robô da frota num galpão) e decide quais liberaria. Em metade dos
-cérebros ela testa sozinha; na outra metade, usa um relatório automático. No fim, eu revelo quais
-cérebros tinham defeito.
-
-**Pergunta sobre o futuro.** Quando robôs forem pilotados por redes neurais que ninguém consegue
-abrir, uma ferramenta de testes automáticos ajuda as pessoas a decidir se liberam o robô, ou só
-dá a elas uma confiança que não deveriam ter?
-
-**Tecnologia emergente, e por que não dá com tecnologia madura.** O que se homologa é uma
-política de controle aprendida, condicionada ao corpo. Na pilha madura (controle modular escrito
-à mão para cada robô), a homologação é feita módulo por módulo, e cada falha tem um responsável.
-O problema que este experimento estuda, decidir sobre um sistema que não se decompõe, não existe
-na pilha madura. O planejador de rota é maduro e não está sendo testado.
-
-**O que eu espero que aconteça (escrito antes).**
-- Na bancada, as pessoas vão testar os robôs e missões mais óbvios e vão liberar cérebros com
-  defeito escondido.
-- O relatório vai melhorar o acerto, mas vai aumentar a confiança também nas decisões erradas.
-- Ninguém vai reprovar sem ver uma falha acontecendo: número sozinho não convence.
-- Sobre quem deve assinar, a turma não vai concordar, e a maioria vai rejeitar que seja a
-  própria empresa que fez o cérebro.
-
-**Limitações.** Física 2D simplificada, com carga igual em todas as rodas e atrito "macio"; o
-planejador conhece o mapa exato; os defeitos vêm de lacunas de treino escolhidas por mim, que é
-como esse tipo de defeito aparece em sistemas reais, mas aqui em escala muito menor.
