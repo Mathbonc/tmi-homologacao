@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapa 0 concluída; próxima: etapa 1 · **2% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 e 1 concluídas; próxima: etapa 2 · **17% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -371,7 +371,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | | Etapa | Peso | Tempo | Ao terminar, dá para demonstrar... |
 |---|---|---|---|---|
 | ☑ | 0. Preparar | 2% | 30 min | — |
-| ☐ | 1. Medição: gravidade, perturbações, pré-cálculo | 15% | 3 h | tabelas no terminal |
+| ☑ | 1. Medição: gravidade, perturbações, pré-cálculo | 15% | 3 h | tabelas no terminal |
 | ☐ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
 | ☐ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
 | ☐ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |

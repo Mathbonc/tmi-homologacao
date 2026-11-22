@@ -57,6 +57,9 @@ export class World {
     this.t = 0;
     this.done = false; this.reached = false; this.collided = false;
     this.trail = [[this.x, this.y]];
+    // medição de gravidade (só registra; não muda a corrida)
+    this.impact = 0;                                                   // velocidade na batida (m/s)
+    this.minClear = clearance(this.map, this.x, this.y) - this.body.colR;  // menor folga (m)
   }
 
   dist() { return Math.hypot(this.goal.x - this.x, this.goal.y - this.y); }
@@ -110,7 +113,9 @@ export class World {
     }
     this.t++;
     if ((this.t & 1) === 0) this.trail.push([this.x, this.y]);
-    if (clearance(this.map, this.x, this.y) < b.colR) this.collided = true;
+    const cl = clearance(this.map, this.x, this.y);
+    if (cl - b.colR < this.minClear) this.minClear = cl - b.colR;
+    if (cl < b.colR) { this.collided = true; this.impact = Math.hypot(this.vx, this.vy); }
     if (this.dist() < GOAL_R) this.reached = true;
     if (this.collided || this.reached || this.t >= MAX_STEPS) this.done = true;
   }
