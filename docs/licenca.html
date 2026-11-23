@@ -58,6 +58,19 @@
   tr.fora-escopo th.robo { color: var(--soft); text-decoration: line-through; }
   th.fora-escopo { text-decoration: line-through; opacity: .5; }
 
+  /* montador (etapa 8) */
+  .montador { display: grid; grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .montador { grid-template-columns: minmax(0, 1fr); } }
+  .mont-campo { display: flex; gap: 6px; align-items: baseline; font-size: 14px; margin-bottom: 6px; }
+  .mont-campo select, .mont-slots select { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
+  .mont-slots { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: baseline; font-size: 14px; margin-bottom: 6px; }
+  .mont-cv { width: 140px; height: 140px; background: var(--paper); border-radius: 8px; }
+  table.mont-grade { border-collapse: separate; border-spacing: 3px; font-size: 13px; }
+  table.mont-grade th { font-weight: 600; color: var(--soft); text-align: center; padding: 0 2px; }
+  table.mont-grade th.robo { text-align: left; color: var(--ink); white-space: nowrap; padding-right: 6px; }
+  table.mont-grade td { text-align: center; border-radius: 5px; padding: 4px 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  table.mont-grade td.resumo-cel { text-align: left; font-weight: 400; background: none; color: var(--ink); white-space: nowrap; }
+
   /* camadas (4.5) */
   .camadas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   @media (max-width: 900px) { .camadas { grid-template-columns: minmax(0, 1fr); } }
@@ -212,6 +225,35 @@
       <span><svg width="14" height="12"><rect x="1" y="1" width="12" height="10" fill="var(--c-liberado)"/></svg> até o limite</span>
     </div>
     <div id="varreduras" class="varreduras"></div>
+  </div>
+
+  <div class="card no-print" id="montador-card">
+    <h2>Montador: licença de um robô fora da frota</h2>
+    <p class="muted small" style="margin:0 0 8px">Monte um robô com as bases e rodas do experimento e calcule, ao vivo,
+      a licença de cada cérebro para ele: as mesmas 6 sementes por missão, no nominal e numa condição à escolha, com o
+      piloto de referência junto. Roda em segundo plano (Web Worker), sem travar a página; leva alguns segundos.</p>
+    <div class="montador">
+      <div>
+        <div class="row" id="mont-atalhos" style="gap:6px; margin-bottom:8px"></div>
+        <label class="mont-campo">Base <select id="mont-base"></select></label>
+        <div id="mont-slots" class="mont-slots"></div>
+        <div class="row" style="align-items:center; gap:10px">
+          <canvas id="mont-cv" width="200" height="200" class="mont-cv"></canvas>
+          <p id="mont-classe" class="small" style="margin:0"></p>
+        </div>
+      </div>
+      <div>
+        <div class="row" style="gap:10px; align-items:center">
+          <label class="mont-campo">Condição além do nominal <select id="mont-cond"></select></label>
+          <button id="mont-calcular" class="primary">Calcular licença</button>
+        </div>
+        <div id="mont-progresso" class="hidden" style="margin-top:8px">
+          <div class="barra"><div id="mont-barra"></div></div>
+          <span id="mont-prog" class="muted small"></span>
+        </div>
+        <div id="mont-resultado" style="margin-top:8px"><p class="muted">Escolha a montagem e clique em Calcular licença.</p></div>
+      </div>
+    </div>
   </div>
 
   <div class="card no-print" id="camadas-card">

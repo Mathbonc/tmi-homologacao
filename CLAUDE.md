@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 7 concluídas; próxima: etapa 8 · **87% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 8 concluídas; próxima: etapa 9 · **95% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -398,7 +398,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
 | ☑ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
 | ☑ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
-| ☐ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
+| ☑ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
 | ☐ | 9. Fechamento: README, REGISTRO, roteiro, vídeo | 5% | 1,5 h | entrega final |
 | | **Total** | 100% | ~18 a 22 h | |
 
@@ -522,6 +522,10 @@ travar, segue sem ele e volta só se sobrar tempo.
 - **Aceite:** montar o retângulo 1 direcional + 3 bobas dá cinza em tudo para todos os cérebros;
   montar o triciclo com direcional + 2 comuns dá verde no cérebro 1 e mostra diferença no
   cérebro 3; a aba não trava durante o cálculo.
+- *Como ficou (22/11): `docs/core/montador.js` calcula; `docs/montador-worker.js` roda num Web
+  Worker de módulo (sem suporte, cai para o cálculo na própria página, em pedaços). 6 pilotos × 2
+  condições × 7 missões × 6 corridas = 504 corridas, de 4 a 6 s. Para os robôs que também estão no
+  pré-cálculo, o cálculo ao vivo dá as mesmas células (84 de 84).*
 
 ### Etapa 9 — Fechamento (1,5 h)
 

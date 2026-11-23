@@ -5,13 +5,14 @@ import { MISSIONS, WAREHOUSE, missionById } from './core/warehouse.js';
 import { Run, PASSO_OBSTACULO, PASSO_EMPURRAO } from './core/episode.js';
 import { DT } from './core/physics.js';
 import { drawWarehouse, drawPath, drawTrail, drawRobotAt, drawRobot, drawTarget, viewFor, C } from './core/draw.js';
-import { loadPilot, loadModel, TODOS_CEREBROS as BRAIN_NAMES } from './core/pilots.js';
+import { loadPilot, loadModel, TODOS_CEREBROS as BRAIN_NAMES, PILOTOS_LICENCA } from './core/pilots.js';
+import { calcularMontagem, conferirMontagem } from './core/montador.js';
 import {
   ROBOS, roboById, corpoDe, condById, classificar, montarCartao, taxa, riscoDe, piorGravidade, contagem,
   GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao, descTeste,
   camadasPadrao, CLASSES_ROBO, PROIBIDAS, NOME_CAMADA, seMantem
 } from './core/licenca.js';
-import { bodyClass } from './core/parts.js';
+import { bodyClass, BASES, PARTS } from './core/parts.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -72,6 +73,7 @@ async function iniciar() {
   montarSeletor();
   montarLegenda();
   render();
+  montarMontador();
   loadModel().then(m => { versaoModelo = m.versao; renderCartao(); }).catch(() => {});
 }
 let versaoModelo = null;
@@ -643,6 +645,108 @@ for (const k of [1, 2, 4]) {
   b.onclick = () => { velocidade = k; for (const x of $('velocidades').children) x.classList.toggle('sel', x === b); };
   if (k === velocidade) b.classList.add('sel');
   $('velocidades').append(b);
+}
+
+// ---------------------------------------------------------------- montador (etapa 8)
+// Monta um corpo com as bases e rodas de parts.js e calcula a licença dele ao vivo, num Web
+// Worker (sem Worker, roda aqui mesmo em pedaços, cedendo a vez à página entre as células).
+const MONT = { base: 'triciclo', pecas: { f: 'direcional', te: 'comum', td: 'comum' }, cond: 'atraso:0.2', worker: null, res: null, specRes: null };
+const ATALHOS = [
+  { nome: 'Retângulo: 1 direcional + 3 bobas', spec: { base: 'retangulo', pecas: { fe: 'direcional', fd: 'boba', te: 'boba', td: 'boba' } } },
+  { nome: 'Triciclo: direcional + 2 comuns', spec: { base: 'triciclo', pecas: { f: 'direcional', te: 'comum', td: 'comum' } } },
+  { nome: 'Disco: 2 omni + 1 boba', spec: { base: 'disco', pecas: { a: 'omni', b: 'omni', c: 'boba' } } }
+];
+const specMont = () => ({ base: MONT.base, pecas: Object.fromEntries(Object.entries(MONT.pecas).filter(([, t]) => t)) });
+
+function montarMontador() {
+  const selB = $('mont-base');
+  selB.innerHTML = Object.entries(BASES).map(([k, b]) => `<option value="${k}">${esc(b.nome)}</option>`).join('');
+  selB.onchange = () => { MONT.base = selB.value; MONT.pecas = {}; renderMontador(); };
+  $('mont-atalhos').innerHTML = ATALHOS.map((a, i) => `<button class="small" data-atalho="${i}">${esc(a.nome)}</button>`).join('');
+  $('mont-atalhos').onclick = ev => {
+    const i = ev.target?.dataset?.atalho; if (i === undefined) return;
+    MONT.base = ATALHOS[i].spec.base; MONT.pecas = { ...ATALHOS[i].spec.pecas }; renderMontador();
+  };
+  $('mont-slots').onchange = ev => { const s = ev.target?.dataset?.slot; if (s) { MONT.pecas[s] = ev.target.value; renderMontador(); } };
+  const selC = $('mont-cond');
+  selC.innerHTML = CONDICOES.filter(c => c.eixo && temCond(c.id)).map(c => `<option value="${c.id}">${esc(c.rotulo)}</option>`).join('');
+  selC.onchange = () => { MONT.cond = selC.value; };
+  $('mont-calcular').onclick = calcularMontado;
+  renderMontador();
+}
+
+function renderMontador() {
+  $('mont-base').value = MONT.base;
+  $('mont-cond').value = MONT.cond;
+  const base = BASES[MONT.base];
+  $('mont-slots').innerHTML = base.slots.map(s => `<span>${esc(s.nome)}</span><select data-slot="${s.id}">` +
+    `<option value="">vazio</option>` + s.aceita.map(t => `<option value="${t}"${MONT.pecas[s.id] === t ? ' selected' : ''}>${esc(PARTS[t].nome)}</option>`).join('') +
+    '</select>').join('');
+  const conf = conferirMontagem(specMont());
+  const cv = $('mont-cv'), g = cv.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+  if (conf.ok) { g.translate(cv.width / 2, cv.height / 2); g.rotate(-Math.PI / 2); drawRobot(g, conf.body, 300); g.setTransform(1, 0, 0, 1, 0, 0); }
+  // é igual a um robô da frota ou dos extras?
+  const igual = ROBOS.find(r => JSON.stringify(r.spec) === JSON.stringify({ base: MONT.base, pecas: conf.ok ? conf.body.spec.pecas : {} }));
+  $('mont-classe').innerHTML = !conf.ok ? `<span class="aviso-replay">${esc(conf.msg)}</span>`
+    : `Classe: <b>${esc(CLASSES_ROBO[conf.classe])}</b>` + (igual ? `<br><span class="muted">É o mesmo robô que “${esc(igual.nome)}”${igual.frota ? ', da frota' : ', da seção de outros robôs'}.</span>` : '') +
+      (conf.aviso ? `<br><span class="aviso-replay">${esc(conf.aviso)}</span>` : '');
+  $('mont-calcular').disabled = !conf.ok || !!MONT.worker;
+}
+
+function calcularMontado() {
+  const spec = specMont(), conds = ['nominal', MONT.cond];
+  if (!conferirMontagem(spec).ok) return;
+  $('mont-progresso').classList.remove('hidden');
+  $('mont-calcular').disabled = true;
+  $('mont-resultado').innerHTML = '<p class="muted">Calculando… a página continua respondendo enquanto isso.</p>';
+  const t0 = performance.now();
+  const progresso = (f, t) => { $('mont-barra').style.width = `${Math.round(100 * f / t)}%`; $('mont-prog').textContent = `${f} de ${t} corridas`; };
+  const fim = res => {
+    MONT.worker?.terminate?.(); MONT.worker = null;
+    MONT.res = res; MONT.specRes = spec; MONT.condsRes = conds; MONT.segundos = (performance.now() - t0) / 1000;
+    $('mont-prog').textContent += ` · ${MONT.segundos.toFixed(1).replace('.', ',')} s`;
+    renderMontador(); renderResultadoMontagem();
+  };
+  const erro = msg => { MONT.worker?.terminate?.(); MONT.worker = null; $('mont-resultado').innerHTML = `<p class="aviso-replay">Erro no cálculo: ${esc(msg)}</p>`; renderMontador(); };
+  progresso(0, PILOTOS_LICENCA.length * conds.length * missoes.length * L.reps);
+  let w = null;
+  try { w = new Worker(new URL('./montador-worker.js', import.meta.url), { type: 'module' }); } catch { w = null; }
+  if (w) {
+    MONT.worker = w;
+    w.onmessage = ({ data: d }) => d.tipo === 'progresso' ? progresso(d.feitas, d.total) : d.tipo === 'fim' ? fim(d.res) : erro(d.msg);
+    w.onerror = e => { e.preventDefault?.(); w.terminate(); MONT.worker = null; aquiMesmo(); };   // módulo em Worker não suportado
+    w.postMessage({ spec, conds, reps: L.reps });
+  } else aquiMesmo();
+  function aquiMesmo() {
+    MONT.worker = { terminate() {} };
+    calcularMontagem({ spec, conds, reps: L.reps, aoProgresso: progresso, pausa: () => new Promise(r => setTimeout(r, 0)) }).then(fim, e => erro(e.message));
+  }
+}
+
+function renderResultadoMontagem() {
+  const res = MONT.res, esp = res.especialista, cerebros = PILOTOS_LICENCA.filter(p => p !== 'especialista');
+  const conf = conferirMontagem(MONT.specRes);
+  const SIG = { liberado: '✓', testar: '!', defeito: '✕', limite: '–' };
+  const blocos = MONT.condsRes.map(c => {
+    const linhas = cerebros.map(p => {
+      const cls = missoes.map(m => classificar(res[p][c][m], esp[c][m], opc));
+      const def = missoes.filter((m, i) => cls[i] === 'defeito'), lim = missoes.filter((m, i) => cls[i] === 'limite');
+      const resumo = lim.length === missoes.length ? 'fora do envelope: nem a referência pilota'
+        : def.length ? `bloqueado em ${juntar(def)} (defeito do cérebro)` + (lim.length ? `; limite físico em ${juntar(lim)}` : '')
+        : lim.length ? `liberado onde a referência consegue; limite físico em ${juntar(lim)}` : 'liberado em todas as missões';
+      return `<tr><th class="robo">${esc(NOME_PILOTO[p])}</th>` + missoes.map((m, i) => {
+        const b = res[p][c][m];
+        return `<td class="${cls[i]}" title="${esc(`${NOME_PILOTO[p]} · ${missionById(m).nome}\n${CLASSES[cls[i]].nome}\n${b.ok}/${b.n} chegaram · referência ${esp[c][m].ok}/${esp[c][m].n}`)}">${pct(taxa(b))} ${SIG[cls[i]]}</td>`;
+      }).join('') + `<td class="resumo-cel">${esc(resumo)}</td></tr>`;
+    }).join('');
+    const ref = `<tr><th class="robo muted">Referência</th>` + missoes.map(m => `<td class="${taxa(esp[c][m]) >= opc.tol ? 'liberado' : 'limite'}">${pct(taxa(esp[c][m]))}</td>`).join('') + '<td></td></tr>';
+    return `<h3 style="margin:10px 0 2px">${esc(rotuloCond(c))}</h3><table class="mont-grade"><thead><tr><th></th>${missoes.map(m => `<th>${m}</th>`).join('')}<th></th></tr></thead>` +
+      `<tbody>${linhas}${ref}</tbody></table>`;
+  }).join('');
+  const nome = Object.entries(MONT.specRes.pecas).map(([s, t]) => PARTS[t].nome.toLowerCase()).join(', ');
+  $('mont-resultado').innerHTML = `<p style="margin:0"><b>${esc(BASES[MONT.specRes.base].nome)}</b> com ${esc(nome)} · classe ${esc(CLASSES_ROBO[conf.classe])} · ` +
+    `${L.reps} corridas por missão, sementes ${L.seed0} a ${L.seed0 + L.reps - 1} · tolerância ${fmtNum(opc.tol)}, proibida ${PROIBIDAS[opc.proibida || 'grave']}.</p>` + blocos;
 }
 
 // ---------------------------------------------------------------- camadas (4.5)
