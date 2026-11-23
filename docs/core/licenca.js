@@ -183,6 +183,7 @@ const CLASSE_TREINO = {
   carro: 'robôs com direção e eixo fixo (tipo carro)',
   diferencial: 'robôs de tração diferencial'
 };
+const pct = x => `${Math.round(100 * x)}%`;
 const juntar = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' e ' + xs[xs.length - 1];
 
 // bloqueios: [[robo, missao]] com defeito do cérebro. Devolve frases de situação.
@@ -224,13 +225,12 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
   const bloqueado = [], fora = [], testes = [], dentro = [];
   for (const r of robos) for (const m of missoes) {
     const b = dados.nominal[r][m], e = esp.nominal[r][m];
-    const item = { robo: r, missao: m, taxa: taxa(b), taxaEsp: taxa(e), gravidade: piorGravidade(b), risco: riscoDe(b) };
+    const item = { robo: r, missao: m, cond: 'nominal', taxa: taxa(b), taxaEsp: taxa(e), gravidade: piorGravidade(b), risco: riscoDe(b) };
     const cls = nominal[r][m];
     if (cls === 'defeito') bloqueado.push(item);
     else if (cls === 'limite') fora.push(item);
     else { dentro.push(item); if (cls === 'testar') testes.push(item); }
   }
-  testes.sort((a, b) => b.risco - a.risco);
 
   // liberado para: robôs inteiros e exceções
   const exc = {};
@@ -261,6 +261,37 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
     limites.push({ ...v, texto: textoLimite(eixo, v) });
   }
 
+  // Testes físicos (3.2): além das células amarelas do nominal, as da borda de cada varredura.
+  // Para cada eixo com limite, cada célula do escopo entra se ficou amarela num nível até o limite,
+  // ou se no nível logo acima do limite ela vira defeito (passou raspando no limite). Uma entrada por
+  // célula e eixo; o risco de uma entrada de borda é o do nível seguinte (o que acontece se passar).
+  const bordas = {};      // condId -> ['robo/missao']: ficam amarelas na grade daquela condição
+  for (const l of limites) {
+    const eixo = eixoById(l.eixo);
+    if (!l.limite) continue;
+    const iLim = eixo.niveis.indexOf(l.limite), idLim = idCondicao(eixo, l.limite);
+    const nvProx = eixo.niveis[iLim + 1], idProx = nvProx !== undefined ? idCondicao(eixo, nvProx) : null;
+    for (const [r, m] of escopo) {
+      let item = null;
+      for (let i = iLim; i >= 0 && !item; i--) {
+        const id = idCondicao(eixo, eixo.niveis[i]);
+        if (!dados[id] || !esp[id]) continue;
+        const b = dados[id][r][m];
+        if (classificar(b, esp[id][r][m], opc) === 'testar')
+          item = { robo: r, missao: m, cond: id, eixo: eixo.id, nivel: eixo.niveis[i], taxa: taxa(b), gravidade: piorGravidade(b), risco: riscoDe(b) };
+      }
+      if (idProx && dados[idProx] && esp[idProx] && classificar(dados[idProx][r][m], esp[idProx][r][m], opc) === 'defeito') {
+        const bn = dados[idProx][r][m];
+        const borda = { robo: r, missao: m, cond: idLim, eixo: eixo.id, nivel: l.limite, borda: true, nivelSeguinte: nvProx,
+                        taxa: taxa(bn), gravidade: piorGravidade(bn), risco: riscoDe(bn) };
+        if (!item || borda.risco >= item.risco) item = borda;
+        (bordas[idLim] ||= []).push(`${r}/${m}`);
+      }
+      if (item) testes.push(item);
+    }
+  }
+  testes.sort((a, b) => b.risco - a.risco);
+
   const treinar = situacoesDeTreino(bloqueado.map(i => [i.robo, i.missao]), robos, missoes);
   for (const l of limites) {
     const eixo = eixoById(l.eixo);
@@ -270,12 +301,20 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
 
   return {
     piloto, versaoFerramenta: VERSAO_FERRAMENTA, tol: opc.tol ?? TOL_PADRAO,
-    classes: nominal, liberadoTexto, resumo, bloqueado, fora, testes, limites, treinar,
+    classes: nominal, liberadoTexto, resumo, bloqueado, fora, testes, limites, treinar, bordas,
     licenciavel: bloqueado.length === 0
   };
 }
 
-const pct = x => `${Math.round(100 * x)}%`;
+// Uma linha de teste físico, sem o risco (quem chama acrescenta).
+export function descTeste(i) {
+  const nome = roboById(i.robo).nome, g = GRAV_TEXTO[i.gravidade];
+  if (i.cond === 'nominal') return `${nome} em ${i.missao}, condição nominal: ${g}`;
+  const eixo = eixoById(i.eixo), nv = eixo.binario ? '' : ` de ${eixo.fmt(i.nivel)}`;
+  if (i.borda) return `${nome} em ${i.missao}, no limite (${eixo.curto}${nv}): com ${eixo.fmt(i.nivelSeguinte)} já cai para ${pct(i.taxa)}, pior caso ${g}`;
+  return `${nome} em ${i.missao}, com ${eixo.curto}${nv}: ${g}`;
+}
+
 export function cartaoTexto(c) {
   const L = [];
   const nomeR = r => roboById(r).nome;
@@ -291,7 +330,7 @@ export function cartaoTexto(c) {
   L.push(`  Fora do envelope (limite físico): ${c.fora.length ? '' : 'nada'}`);
   for (const i of c.fora) L.push(`    - ${nomeR(i.robo)} em ${i.missao}: nem o piloto de referência consegue (${pct(i.taxaEsp)})`);
   L.push(`  Testes físicos obrigatórios: ${c.testes.length ? c.testes.length + ' (por risco)' : 'nenhum'}`);
-  for (const i of c.testes.slice(0, 15)) L.push(`    - ${nomeR(i.robo)} em ${i.missao}: risco ${i.risco.toFixed(2)}, ${GRAV_TEXTO[i.gravidade]}`);
+  for (const i of c.testes.slice(0, 15)) L.push(`    - risco ${i.risco.toFixed(2)} · ${descTeste(i)}`);
   if (c.testes.length > 15) L.push(`    … e mais ${c.testes.length - 15}`);
   L.push(`  O que falta treinar: ${c.treinar.length ? '' : 'nada'}`);
   for (const t of c.treinar) L.push(`    - ${t}`);

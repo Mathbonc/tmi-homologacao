@@ -8,7 +8,7 @@ import { drawWarehouse, drawPath, drawTrail, drawRobotAt, drawRobot, drawTarget,
 import { loadPilot, loadModel, BRAIN_NAMES } from './core/pilots.js';
 import {
   ROBOS, roboById, corpoDe, condById, classificar, montarCartao, taxa, riscoDe, piorGravidade, contagem,
-  GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao
+  GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao, descTeste
 } from './core/licenca.js';
 
 const $ = id => document.getElementById(id);
@@ -19,7 +19,7 @@ const NOME_PILOTO = { especialista: 'Piloto de referência', cerebro1: 'Cérebro
 const SIMBOLO = { liberado: '✓', testar: '!', defeito: '✕', limite: '–' };
 const DESC_CLASSE = {
   liberado: 'cérebro ≥ 90%, sem colisão grave',
-  testar: 'liberado, mas com falha leve ou quase-acidente',
+  testar: 'liberado, mas com falha leve, quase-acidente ou no último nível antes de um limite',
   defeito: 'a referência consegue, o cérebro não',
   limite: 'nem a referência consegue'
 };
@@ -37,6 +37,7 @@ const curtoMissao = m => m.nome.replace(/Doca (\d) → Estação (\w).*/, 'D$1�
 const COR_B = '#c2551f', COR_E = '#2a6fb0';      // séries da varredura (paleta validada)
 const fmtNum = x => String(x).replace('.', ',');
 const rotuloCond = id => condById(id).rotulo;
+const fmtRisco = x => x.toFixed(2).replace('.', ',');
 
 // ---------------------------------------------------------------- estado
 let L = null;                      // licencas.json
@@ -44,7 +45,12 @@ const E = { piloto: 'cerebro1', cond: 'nominal', robo: null, missao: null };
 const opc = { tol: TOL_PADRAO };
 
 const celula = (p, r, m, cond = E.cond) => L.pilotos[p]?.[cond]?.[r]?.[m];
-const classe = (r, m) => classificar(celula(E.piloto, r, m), celula('especialista', r, m), opc);
+// borda: a célula está no último nível antes do limite deste eixo (vira amarela: testar)
+let bordasCartao = {};
+const ehBorda = (r, m) => (bordasCartao[E.cond] || []).includes(`${r}/${m}`);
+const classe = (r, m) => classificar(celula(E.piloto, r, m), celula('especialista', r, m), { ...opc, borda: ehBorda(r, m) });
+// ícone da pior gravidade (3.5); 'ok' não tem ícone
+const ICONE_G = { grave: '✸', raspao: '≈', travou: '◷', quase: '◌' };
 
 // ---------------------------------------------------------------- início
 async function iniciar() {
@@ -120,13 +126,17 @@ function marcarSeletor() {
 
 function montarLegenda() {
   $('legenda').innerHTML = Object.keys(CLASSES).map(k =>
-    `<span><span class="sw ${k}">${SIMBOLO[k]}</span><b>${CLASSES[k].nome}</b> <span class="muted">${DESC_CLASSE[k]}</span></span>`).join('');
+    `<span><span class="sw ${k}">${SIMBOLO[k]}</span><b>${CLASSES[k].nome}</b> <span class="muted">${DESC_CLASSE[k]}</span></span>`).join('') +
+    `<span class="leg-g"><b>Pior caso nas corridas do cérebro:</b> ` +
+    ['grave', 'raspao', 'travou', 'quase'].map(g => `<span class="gi-leg">${ICONE_G[g]}</span> ${GRAV_TEXTO[g]}`).join(' · ') +
+    ` <span class="muted">(sem ícone: todas chegaram com folga)</span></span>`;
 }
 
 // ---------------------------------------------------------------- render geral
 function render() {
   gravarHash();
   const cartao = cartaoAtual();
+  bordasCartao = cartao.bordas;
   const r = $('resumo');
   r.textContent = `${NOME_PILOTO[E.piloto]}: ${cartao.resumo}.`;
   r.className = 'resumo ' + (cartao.licenciavel ? 'ok' : 'bad');
@@ -199,10 +209,12 @@ function renderGrade(tab, robos, cabecalho) {
       const cls = classe(r, m);
       const td = tr.insertCell();
       td.className = `cel ${cls}` + (E.robo === r && E.missao === m ? ' sel' : '');
-      td.textContent = `${pct(taxa(b))} ${SIMBOLO[cls]}`;
-      td.title = `${roboById(r).nome} · ${missionById(m).nome}\n${CLASSES[cls].nome}\n` +
+      const g = piorGravidade(b);
+      td.innerHTML = `${pct(taxa(b))} ${SIMBOLO[cls]}` + (ICONE_G[g] ? `<span class="gi">${ICONE_G[g]}</span>` : '');
+      td.title = `${roboById(r).nome} · ${missionById(m).nome}\n${CLASSES[cls].nome}` +
+        (ehBorda(r, m) ? ' (último nível antes do limite: no nível seguinte vira defeito)' : '') + '\n' +
         `${NOME_PILOTO[E.piloto]}: ${b.ok}/${b.n} chegaram\nReferência: ${e.ok}/${e.n} chegaram\n` +
-        `Risco: ${riscoDe(b).toFixed(2).replace('.', ',')} · pior: ${GRAV_TEXTO[piorGravidade(b)]}`;
+        `Risco: ${fmtRisco(riscoDe(b))} · pior caso: ${GRAV_TEXTO[g]}`;
       td.onclick = () => { E.robo = r; E.missao = m; player.parar(); render(); };
     }
   }
@@ -221,11 +233,12 @@ function renderPainel() {
   $('p-missao').textContent = mis.nome + (E.cond !== 'nominal' ? ` · condição: ${rotuloCond(E.cond)}` : '') +
     (roboById(r).frota ? '' : ' · robô que não faz parte da frota (não entra na licença)');
   const refOk = taxa(e) >= opc.tol;
+  const linhaRisco = c => { const g = piorGravidade(c); return `<span class="small">risco ${fmtRisco(riscoDe(c))} · pior caso: ${ICONE_G[g] ? ICONE_G[g] + ' ' : ''}${GRAV_TEXTO[g]}</span>`; };
   $('p-lado').innerHTML =
     `<div class="bloco ${cls}"><b>${NOME_PILOTO[E.piloto]}</b><span class="tx">${b.ok}/${b.n}</span> chegaram<br>` +
-    `<span class="small">${SIMBOLO[cls]} ${CLASSES[cls].nome}</span></div>` +
+    `<span class="small">${SIMBOLO[cls]} ${CLASSES[cls].nome}${ehBorda(r, m) ? ' (último nível antes do limite)' : ''}</span><br>${linhaRisco(b)}</div>` +
     `<div class="bloco ${refOk ? 'liberado' : 'limite'}"><b>Piloto de referência</b><span class="tx">${e.ok}/${e.n}</span> chegaram<br>` +
-    `<span class="small">${refOk ? 'consegue: o corpo e a missão são possíveis' : 'não consegue: limite físico'}</span></div>`;
+    `<span class="small">${refOk ? 'consegue: o corpo e a missão são possíveis' : 'não consegue: limite físico'}</span><br>${linhaRisco(e)}</div>`;
   $('p-col-b').textContent = NOME_PILOTO[E.piloto].toLowerCase();
   const tb = $('p-corridas'); tb.innerHTML = '';
   for (let k = 0; k < b.n; k++) {
@@ -601,9 +614,8 @@ function renderCartao(c = cartaoAtual()) {
       `<li><b>${esc(g.nome)}</b>, ${g.missoesTexto}: nenhum piloto conseguiu, nem o de referência. Não conta contra o cérebro.</li>`), 'Nada: em toda a frota o piloto de referência consegue.')}
 
     <h3>Testes físicos obrigatórios</h3>
-    ${lista(c.testes.map(i =>
-      `<li>${esc(roboById(i.robo).nome)} em ${i.missao} (${esc(missionById(i.missao).nome)}): risco ${i.risco.toFixed(2).replace('.', ',')}, ${GRAV_TEXTO[i.gravidade]}.</li>`),
-      'Nenhum na condição nominal.')}
+    ${c.testes.length ? '<p class="muted small" style="margin:0">Ordenados por risco (média dos pesos: colisão grave 10, raspão 3, travou 2, quase-acidente 1). Inclui as células amarelas do nominal e as que passam raspando num limite de operação.</p>' : ''}
+    ${lista(c.testes.map(i => `<li><b>risco ${fmtRisco(i.risco)}</b> · ${esc(descTeste(i))}.</li>`), 'Nenhum.')}
 
     <h3>O que falta treinar</h3>
     ${lista(c.treinar.map(t => `<li>${esc(t[0].toUpperCase() + t.slice(1))}.</li>`), 'Nada.')}

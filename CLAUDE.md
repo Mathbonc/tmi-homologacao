@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 4 concluídas; próxima: etapa 5 · **57% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 5 concluídas; próxima: etapa 6 · **65% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -384,7 +384,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
 | ☑ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
 | ☑ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
-| ☐ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
+| ☑ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
 | ☐ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
 | ☐ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
 | ☐ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
@@ -465,6 +465,9 @@ travar, segue sem ele e volta só se sobrar tempo.
 
 - Ícone de gravidade na grade; risco no tooltip e no painel; células amarelas; lista "testes
   físicos obrigatórios" ordenada por risco no cartão.
+- *Como ficou (22/11): os testes físicos são as células amarelas do nominal mais, em cada eixo
+  com limite, as células que ficam amarelas num nível até o limite ou que viram defeito logo no
+  nível seguinte ("passam raspando"); o risco de uma entrada de borda é o do nível seguinte.*
 - **Aceite:** no cérebro 4, Mecanum aparece com colisões graves e Omni com gravidade menor (é a
   distinção que a turma fez de cabeça); a lista de testes físicos do cérebro 1 não fica vazia nem
   enorme (entre 3 e 15 itens).
