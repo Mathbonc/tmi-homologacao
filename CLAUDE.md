@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 e 1 concluídas; próxima: etapa 2 · **17% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 2 concluídas; próxima: etapa 3 · **37% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -283,8 +283,11 @@ final: licenciador →". `licenca.html` ganha um link de volta "O experimento qu
 - Replay: canvas do galpão com o robô andando em tempo real (1×/2×/4×), rota planejada, rastro,
   e a perturbação visível (seta no empurrão, obstáculo aparecendo, ponto-alvo tremendo no ruído,
   rótulo "atraso 0,2 s").
-- Todos os rastros da célula: todas as corridas daquela célula desenhadas juntas, cor por
-  resultado. É a "auditoria humana" pedida pela turma.
+- Rastros nas 7 missões: o robô da célula clicada em todas as missões, uma corrida por missão,
+  desenhadas juntas com cor por resultado; numa missão cujas corridas terminam diferente
+  (chegou / bateu / travou), aparecem todas as corridas dela. É a "auditoria humana" pedida pela
+  turma. *(Decidido pelo Matheus em 22/11: as corridas de uma mesma célula são quase idênticas e
+  não mostravam nada; ver o robô em todas as rotas mostra mais.)*
 
 ### 4.3 Varredura
 
@@ -372,7 +375,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 |---|---|---|---|---|
 | ☑ | 0. Preparar | 2% | 30 min | — |
 | ☑ | 1. Medição: gravidade, perturbações, pré-cálculo | 15% | 3 h | tabelas no terminal |
-| ☐ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
+| ☑ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
 | ☐ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
 | ☐ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
 | ☐ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |

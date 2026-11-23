@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licenciador de cérebros</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* cores das classes de célula (CLAUDE.md 3.2) */
+  :root {
+    --c-liberado: #d6ecdd; --t-liberado: #1d5a39;
+    --c-testar: #f5e3a6;   --t-testar: #6e5200;
+    --c-defeito: #f2c7b1;  --t-defeito: #87310d;
+    --c-limite: #e1e3e5;   --t-limite: #4d575e;
+  }
+  .lic-cab { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin-bottom: 10px; }
+  .lic-cab h1 { margin: 0; }
+  .lic-barra { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+  .seletor { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .seletor > span { margin-right: 4px; }
+  .resumo { margin-top: 12px; font-size: 17px; font-weight: 600; }
+  .resumo.ok { color: var(--ok); } .resumo.bad { color: var(--bad); }
+
+  .lic-mesa { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(330px, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 1000px) { .lic-mesa { grid-template-columns: minmax(0, 1fr); } }
+
+  .legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; margin-bottom: 10px; }
+  .legenda .sw { display: inline-block; min-width: 22px; padding: 0 4px; border-radius: 4px; text-align: center; font-weight: 700; margin-right: 5px; }
+  .grade-wrap { overflow-x: auto; }
+  table.grade { border-collapse: separate; border-spacing: 3px; width: 100%; font-size: 13px; }
+  table.grade th, table.grade td { border: 0; padding: 0; }
+  table.grade thead th { text-align: center; color: var(--soft); font-weight: 600; padding-bottom: 2px; line-height: 1.15; }
+  table.grade thead th small { display: block; font-weight: 400; font-size: 11px; white-space: nowrap; }
+  table.grade th.robo { color: var(--ink); font-weight: 600; white-space: nowrap; padding-right: 6px; }
+  table.grade th.robo canvas { width: 28px; height: 28px; vertical-align: middle; margin-right: 4px; }
+  td.cel { text-align: center; border-radius: 6px; cursor: pointer; padding: 7px 2px; font-weight: 700;
+           font-variant-numeric: tabular-nums; border: 2px solid transparent; white-space: nowrap; }
+  td.cel:hover { border-color: rgba(20,24,28,.35); }
+  td.cel.sel { border-color: var(--ink); }
+  .liberado { background: var(--c-liberado); color: var(--t-liberado); }
+  .testar   { background: var(--c-testar);   color: var(--t-testar); }
+  .defeito  { background: var(--c-defeito);  color: var(--t-defeito); }
+  .limite   { background: var(--c-limite);   color: var(--t-limite); }
+  .extras-tit { margin: 14px 0 2px; }
+
+  /* painel da célula */
+  .lado { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+  .bloco { border-radius: 8px; padding: 8px 10px; }
+  .bloco b { display: block; }
+  .bloco .tx { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  table.corridas { font-size: 13px; }
+  table.corridas td, table.corridas th { padding: 3px 4px; }
+  table.corridas button { padding: 1px 8px; font-size: 12px; }
+  table.corridas td.g-ok { color: var(--ok); }
+  table.corridas td.g-quase { color: var(--warn); }
+  table.corridas td.g-travou, table.corridas td.g-raspao, table.corridas td.g-grave { color: var(--bad); }
+  canvas.galpao { margin-top: 10px; }
+  .aviso-replay { color: var(--warn); font-size: 13px; }
+  .dica { color: var(--soft); margin: 30px 0; text-align: center; }
+
+  /* cartão da licença */
+  #cartao { border: 2px solid var(--ink); border-radius: 10px; }
+  #cartao h2 { font-size: 22px; margin: 0; }
+  #cartao h3 { border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  #cartao ul { margin: 4px 0 8px; padding-left: 20px; }
+  #cartao li { margin: 2px 0; }
+  .selo-lic { display: inline-block; padding: 3px 12px; border-radius: 99px; font-weight: 700; font-size: 14px; }
+  .selo-lic.ok { background: var(--ok-soft); color: var(--ok); }
+  .selo-lic.bad { background: var(--bad-soft); color: var(--bad); }
+  .assinaturas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 26px; }
+  .assinaturas div { border-top: 1px solid var(--ink); padding-top: 4px; font-size: 13px; }
+  @media (max-width: 640px) { .assinaturas { grid-template-columns: 1fr; } .lado { grid-template-columns: 1fr; } }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; font-size: 12pt; }
+    .wrap { max-width: none; padding: 0; }
+    #cartao { border: 1px solid #000; margin: 0; }
+    #cartao h3 { break-after: avoid; }
+    #cartao li { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="no-print">
+    <div class="lic-cab">
+      <h1>Licenciador de cérebros de robô</h1>
+      <span class="grow"></span>
+      <a href="index.html" class="small">O experimento que originou isto</a>
+    </div>
+    <p class="muted" style="max-width:900px">Escolha um cérebro e veja a licença de operação dele: para
+      quais robôs e missões ele está liberado, o que fica bloqueado e por quê. Cada célula compara o
+      cérebro com o <b>piloto de referência</b> (o controlador que gerou os dados de treino), nas
+      mesmas corridas: se a referência consegue e o cérebro não, é <b>defeito do cérebro</b>; se nem a
+      referência consegue, é <b>limite físico</b> e não conta contra o cérebro.</p>
+  </header>
+
+  <div class="card no-print">
+    <div class="lic-barra">
+      <div class="seletor" id="sel-cerebro"><span class="muted">Cérebro</span></div>
+      <div class="seletor"><span class="muted">Condição</span><b>nominal</b></div>
+    </div>
+    <div id="resumo" class="resumo">Carregando o pré-cálculo…</div>
+  </div>
+
+  <div class="lic-mesa no-print">
+    <div class="card">
+      <h2>Robô × missão</h2>
+      <div class="legenda" id="legenda"></div>
+      <div class="grade-wrap"><table class="grade" id="grade"></table></div>
+      <h3 class="extras-tit">Outros robôs, que não fazem parte da frota da fábrica</h3>
+      <p class="muted small" style="margin:0 0 4px">A licença cobre só a frota da fábrica: os 7 robôs acima, os
+        da regra do experimento. Estas são montagens avulsas, calculadas para mostrar o que é limite físico
+        (cinza: nem a referência consegue). Verde aqui quer dizer que o cérebro pilotaria aquele robô se a
+        fábrica o incluísse na frota dela.</p>
+      <div class="grade-wrap"><table class="grade" id="grade-extras"></table></div>
+      <p class="muted small" id="rodape-grade" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card" id="painel">
+      <div id="painel-vazio" class="dica">Clique numa célula da grade para ver as corridas,<br>assistir ao replay e comparar com o piloto de referência.</div>
+      <div id="painel-cel" class="hidden">
+        <h2 id="p-titulo"></h2>
+        <div id="p-missao" class="muted small"></div>
+        <div class="lado" id="p-lado"></div>
+        <table class="corridas"><thead><tr>
+          <th>#</th><th>semente</th><th id="p-col-b">cérebro</th><th></th><th>referência</th><th></th>
+        </tr></thead><tbody id="p-corridas"></tbody></table>
+        <div class="row" style="margin-top:8px">
+          <button id="rastros-b">Rastros nas 7 missões: cérebro</button>
+          <button id="rastros-e">Rastros nas 7 missões: referência</button>
+        </div>
+        <p class="muted small" style="margin:4px 0 0">Uma corrida por missão, todas sobrepostas. Se as corridas
+          de uma missão terminam diferente (umas chegam e outras não, ou umas batem e outras travam),
+          aparecem todas as daquela missão.</p>
+      </div>
+      <canvas id="cv" class="galpao" width="1000" height="750"></canvas>
+      <div class="row" style="margin-top:6px">
+        <span class="muted small">velocidade</span>
+        <span id="velocidades" class="row" style="gap:4px"></span>
+      </div>
+      <div id="status" class="status small"></div>
+    </div>
+  </div>
+
+  <div class="card" id="cartao"></div>
+  <div class="row no-print" style="margin-bottom:30px">
+    <button id="imprimir" class="primary">Imprimir / salvar PDF</button>
+    <span class="muted small">imprime só o cartão da licença</span>
+  </div>
+
+</div>
+<script type="module" src="licenca.js"></script>
+</body>
+</html>
