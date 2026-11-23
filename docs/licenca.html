@@ -43,6 +43,20 @@
   .defeito  { background: var(--c-defeito);  color: var(--t-defeito); }
   .limite   { background: var(--c-limite);   color: var(--t-limite); }
   .extras-tit { margin: 14px 0 2px; }
+  #sel-cond { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: #fff; max-width: 100%; }
+  #resumo-cond { margin-top: 4px; }
+
+  /* varredura (4.3) */
+  .varr-legenda { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-bottom: 6px; align-items: center; }
+  .varr-legenda svg { vertical-align: middle; }
+  .varreduras { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 16px; }
+  .varr h3 { font-size: 14px; margin: 0; }
+  .varr .lim { font-size: 13px; margin: 0 0 2px; min-height: 2.6em; }
+  .varr svg { width: 100%; height: auto; display: block; }
+  .varr .col { cursor: pointer; }
+  .varr .col:hover rect.hit { fill: rgba(20,24,28,.06); }
+  .varr text { font: 11px system-ui, sans-serif; fill: var(--soft); }
+  .varr text.sel { fill: var(--ink); font-weight: 700; }
 
   /* painel da célula */
   .lado { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
@@ -101,9 +115,11 @@
   <div class="card no-print">
     <div class="lic-barra">
       <div class="seletor" id="sel-cerebro"><span class="muted">Cérebro</span></div>
-      <div class="seletor"><span class="muted">Condição</span><b>nominal</b></div>
+      <label class="seletor"><span class="muted">Condição</span>
+        <select id="sel-cond" title="Imprevisibilidade aplicada a todas as corridas da grade (cérebro e referência)"></select></label>
     </div>
     <div id="resumo" class="resumo">Carregando o pré-cálculo…</div>
+    <div id="resumo-cond" class="muted small"></div>
   </div>
 
   <div class="lic-mesa no-print">
@@ -144,6 +160,20 @@
       </div>
       <div id="status" class="status small"></div>
     </div>
+  </div>
+
+  <div class="card no-print" id="varredura-card">
+    <h2>Limites de operação: varredura</h2>
+    <p class="muted small" style="margin:0 0 6px">Cada gráfico aumenta uma imprevisibilidade, nível a nível. O eixo vertical é a
+      fração das células que o cérebro tem liberadas no nominal e que continuam de pé (taxa ≥ 90%, sem colisão grave).
+      O <b>limite</b> é o maior nível em que o cérebro não tem defeito em nenhuma delas; onde a referência também
+      cai, é limite físico e não conta. Clique num nível para ver a grade naquela condição.</p>
+    <div class="varr-legenda small">
+      <span><svg width="26" height="10"><line x1="1" y1="5" x2="25" y2="5" stroke="#c2551f" stroke-width="2"/><circle cx="13" cy="5" r="3.5" fill="#c2551f"/></svg> <span id="leg-cerebro">cérebro</span></span>
+      <span><svg width="26" height="10"><line x1="1" y1="5" x2="25" y2="5" stroke="#2a6fb0" stroke-width="2" stroke-dasharray="4 3"/><rect x="10" y="2" width="6" height="6" fill="#2a6fb0"/></svg> piloto de referência</span>
+      <span><svg width="14" height="12"><rect x="1" y="1" width="12" height="10" fill="var(--c-liberado)"/></svg> até o limite</span>
+    </div>
+    <div id="varreduras" class="varreduras"></div>
   </div>
 
   <div class="card" id="cartao"></div>

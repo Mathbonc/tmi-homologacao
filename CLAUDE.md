@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 3 concluídas; próxima: etapa 4 · **42% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 4 concluídas; próxima: etapa 5 · **57% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -223,6 +223,12 @@ derivado da semente da corrida (`mulberry32(seed * 7 + 3)`), para o replay repet
 
 O especialista recebe as mesmas perturbações: é isso que torna a comparação justa.
 
+*Obstáculo, como ficou (etapa 4, 22/11): raio de 0,25 m; se o ponto 1,2 m à frente na rota estiver
+a menos de 0,5 m da borda do robô em linha reta (curva fechada), ele anda pela rota até ficar longe; se o
+robô já está perto do destino no passo 80, o obstáculo não surge. Medido com o especialista em 420
+corridas: sempre houve rota (às vezes por outro corredor) e em 22 o obstáculo não surgiu. "Sem
+rota" conta como `travou`. O piloto não vê o mapa: percebe o obstáculo só pela rota nova.*
+
 ### 3.5 Gravidade
 
 Medição aditiva em `World` (não muda o resultado da corrida):
@@ -377,7 +383,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 1. Medição: gravidade, perturbações, pré-cálculo | 15% | 3 h | tabelas no terminal |
 | ☑ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
 | ☑ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
-| ☐ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
+| ☑ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
 | ☐ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
 | ☐ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
 | ☐ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |

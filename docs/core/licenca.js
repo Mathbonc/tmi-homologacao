@@ -31,15 +31,18 @@ export const EIXOS = [
   { id: 'giro', nome: 'Saída em qualquer direção', curto: 'saída', niveis: [45, 90, 135, 180], fmt: n => `${n}°` },
   { id: 'empurrao', nome: 'Empurrão', curto: 'empurrão', niveis: [0.3, 0.6, 0.9, 1.2], fmt: n => `${fmtNum(n)} m/s` },
   { id: 'ruido', nome: 'Ruído de sensor', curto: 'ruído', niveis: [10, 20, 30, 45], fmt: n => `${n}°` },
-  { id: 'atraso', nome: 'Atraso de comando', curto: 'atraso', niveis: [0.1, 0.2, 0.3, 0.5], fmt: n => `${fmtNum(n)} s` }
-  // obstáculo surgindo: etapa 4
+  { id: 'atraso', nome: 'Atraso de comando', curto: 'atraso', niveis: [0.1, 0.2, 0.3, 0.5], fmt: n => `${fmtNum(n)} s` },
+  // binário: um nível só (sim); a condição se chama só 'obstaculo'
+  { id: 'obstaculo', nome: 'Obstáculo surgindo', curto: 'obstáculo surgindo', niveis: [1], binario: true, fmt: () => 'sim' }
 ];
 export const eixoById = id => EIXOS.find(e => e.id === id);
+export const idCondicao = (eixo, nivel) => eixo.binario ? eixo.id : `${eixo.id}:${nivel}`;
 
 export const CONDICOES = [
   { id: 'nominal', eixo: null, nivel: 0, opts: null, rotulo: 'Nominal' },
   ...EIXOS.flatMap(e => e.niveis.map(n => ({
-    id: `${e.id}:${n}`, eixo: e.id, nivel: n, opts: { [e.id]: n }, rotulo: `${e.nome}: ${e.fmt(n)}`
+    id: idCondicao(e, n), eixo: e.id, nivel: n, opts: { [e.id]: e.binario ? true : n },
+    rotulo: e.binario ? e.nome : `${e.nome}: ${e.fmt(n)}`
   })))
 ];
 export const condById = id => CONDICOES.find(c => c.id === id);
@@ -148,7 +151,7 @@ export function varredura(eixo, porCond, escopo, opc = {}) {
   const niveis = [];
   let limite = 0, limiteEsp = 0, quebrouB = false, quebrouE = false;
   for (const nivel of eixo.niveis) {
-    const d = porCond(`${eixo.id}:${nivel}`);
+    const d = porCond(idCondicao(eixo, nivel));
     if (!d) break;
     let defeitos = 0, mantB = 0, mantE = 0;
     for (const [r, m] of escopo) {
@@ -163,11 +166,12 @@ export function varredura(eixo, porCond, escopo, opc = {}) {
     if (!quebrouE && mantE === escopo.length) limiteEsp = nivel; else quebrouE = true;
   }
   const max = niveis.length === eixo.niveis.length && !quebrouB;
-  return { eixo: eixo.id, niveis, limite, limiteEsp, maximo: max, completo: niveis.length === eixo.niveis.length };
+  return { eixo: eixo.id, niveis, limite, limiteEsp, maximo: max, completo: niveis.length === eixo.niveis.length, escopoN: escopo.length };
 }
 
 export function textoLimite(eixo, v) {
   if (!v.completo && !v.niveis.length) return null;
+  if (eixo.binario) return `${eixo.nome}: ` + (v.limite ? 'sim, desvia' : `não, defeito em ${v.niveis[0].defeitos} célula${v.niveis[0].defeitos > 1 ? 's' : ''}`);
   if (v.limite === 0) return `${eixo.nome}: não tolera (defeito já em ${eixo.fmt(eixo.niveis[0])})`;
   return `${eixo.nome}: até ${eixo.fmt(v.limite)}` + (v.maximo ? ' (maior nível testado)' : '');
 }
@@ -252,7 +256,7 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
   const escopo = dentro.map(i => [i.robo, i.missao]);
   const limites = [];
   for (const eixo of EIXOS) {
-    if (!eixo.niveis.some(n => dados[`${eixo.id}:${n}`] && esp[`${eixo.id}:${n}`])) continue;
+    if (!eixo.niveis.some(n => dados[idCondicao(eixo, n)] && esp[idCondicao(eixo, n)])) continue;
     const v = varredura(eixo, id => dados[id] && esp[id] ? { b: dados[id], e: esp[id] } : null, escopo, opc);
     limites.push({ ...v, texto: textoLimite(eixo, v) });
   }
@@ -260,6 +264,7 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
   const treinar = situacoesDeTreino(bloqueado.map(i => [i.robo, i.missao]), robos, missoes);
   for (const l of limites) {
     const eixo = eixoById(l.eixo);
+    if (eixo.binario) { if (!l.limite) treinar.push('desviar de obstáculo que surge no caminho (rota replanejada de repente)'); continue; }
     if (!l.maximo && l.limite < l.limiteEsp) treinar.push(`${eixo.curto} acima de ${l.limite ? eixo.fmt(l.limite) : 'zero'} (o piloto de referência aguenta até ${eixo.fmt(l.limiteEsp)})`);
   }
 

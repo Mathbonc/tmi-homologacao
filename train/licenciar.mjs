@@ -15,7 +15,7 @@ import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { MISSIONS } from '../docs/core/warehouse.js';
 import { Run } from '../docs/core/episode.js';
 import {
-  CONDICOES, EIXOS, ROBOS, SEED0, TOL_PADRAO, VERSAO_FERRAMENTA, condById, corpoDe, roboById,
+  CONDICOES, EIXOS, ROBOS, SEED0, TOL_PADRAO, VERSAO_FERRAMENTA, condById, corpoDe, roboById, idCondicao,
   novaCelula, somarCorrida, celulaJSON, montarCartao, cartaoTexto, classificarGrade, fracaoMantida, varredura
 } from '../docs/core/licenca.js';
 
@@ -177,7 +177,7 @@ function imprimir(dados, brainNames) {
 
   // varreduras: fração de células da frota mantidas, por nível
   for (const eixo of EIXOS) {
-    const ids = eixo.niveis.map(n => `${eixo.id}:${n}`);
+    const ids = eixo.niveis.map(n => idCondicao(eixo, n));
     const comDados = p => dados.pilotos[p] && ids.some(id => temLinhas(dados.pilotos[p][id], frota));
     if (!comDados('especialista')) continue;
     const ps = ['especialista', ...brainNames.filter(comDados)];

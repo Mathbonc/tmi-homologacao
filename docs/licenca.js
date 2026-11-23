@@ -2,13 +2,13 @@
 // grade robô × missão, o painel da célula com replay e todos os rastros, e o cartão da licença.
 // Toda a lógica (classificação, cartão, corrida) vem de core/; aqui só se desenha.
 import { MISSIONS, WAREHOUSE, missionById } from './core/warehouse.js';
-import { Run } from './core/episode.js';
+import { Run, PASSO_OBSTACULO, PASSO_EMPURRAO } from './core/episode.js';
 import { DT } from './core/physics.js';
-import { drawWarehouse, drawPath, drawTrail, drawRobotAt, drawRobot, viewFor, C } from './core/draw.js';
+import { drawWarehouse, drawPath, drawTrail, drawRobotAt, drawRobot, drawTarget, viewFor, C } from './core/draw.js';
 import { loadPilot, loadModel, BRAIN_NAMES } from './core/pilots.js';
 import {
-  ROBOS, roboById, corpoDe, condById, classificar, montarCartao, taxa, riscoDe, piorGravidade,
-  GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA
+  ROBOS, roboById, corpoDe, condById, classificar, montarCartao, taxa, riscoDe, piorGravidade, contagem,
+  GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao
 } from './core/licenca.js';
 
 const $ = id => document.getElementById(id);
@@ -34,6 +34,9 @@ const extras = ROBOS.filter(r => !r.frota).map(r => r.id);
 const estacaoDe = m => Object.entries(WAREHOUSE.stations).find(([, p]) => p === m.goal)?.[0];
 // "Doca 1 → Estação A (de costas)" → "D1→A ↺"
 const curtoMissao = m => m.nome.replace(/Doca (\d) → Estação (\w).*/, 'D$1→$2') + (m.costas ? ' ↺' : '');
+const COR_B = '#c2551f', COR_E = '#2a6fb0';      // séries da varredura (paleta validada)
+const fmtNum = x => String(x).replace('.', ',');
+const rotuloCond = id => condById(id).rotulo;
 
 // ---------------------------------------------------------------- estado
 let L = null;                      // licencas.json
@@ -55,6 +58,7 @@ async function iniciar() {
     return;
   }
   lerHash();
+  montarSeletorCond();
   montarSeletor();
   montarLegenda();
   render();
@@ -62,16 +66,39 @@ async function iniciar() {
 }
 let versaoModelo = null;
 
+// #cerebro1/robo/missao@condição (robô, missão e condição são opcionais)
 function lerHash() {
-  const [p, r, m] = decodeURIComponent(location.hash.slice(1)).split('/');
+  const [base, cond] = decodeURIComponent(location.hash.slice(1)).split('@');
+  const [p, r, m] = base.split('/');
   if (BRAIN_NAMES.includes(p) && L.pilotos[p]) E.piloto = p;
   if (roboById(r) && missionById(m)) { E.robo = r; E.missao = m; }
+  E.cond = cond && condById(cond) && temCond(cond) ? cond : 'nominal';
 }
 function gravarHash() {
-  const h = [E.piloto, ...(E.robo ? [E.robo, E.missao] : [])].join('/');
+  const h = [E.piloto, ...(E.robo ? [E.robo, E.missao] : [])].join('/') + (E.cond !== 'nominal' ? '@' + E.cond : '');
   history.replaceState(null, '', '#' + h);
 }
 window.addEventListener('hashchange', () => { lerHash(); player.parar(); marcarSeletor(); render(); });
+
+// a condição existe no pré-cálculo para o cérebro e a referência, na frota inteira
+const temCond = (id, p = E.piloto) => [p, 'especialista'].every(q => frota.every(r => L.pilotos[q]?.[id]?.[r]));
+
+function montarSeletorCond() {
+  const sel = $('sel-cond');
+  sel.innerHTML = '';
+  const opcao = (id, txt) => { const o = document.createElement('option'); o.value = id; o.textContent = txt; return o; };
+  sel.append(opcao('nominal', 'Nominal (sem imprevisibilidade)'));
+  for (const e of EIXOS) {
+    const ids = e.niveis.map(n => idCondicao(e, n)).filter(id => temCond(id));
+    if (!ids.length) continue;
+    if (e.binario) { sel.append(opcao(ids[0], e.nome)); continue; }
+    const g = document.createElement('optgroup'); g.label = e.nome;
+    for (const id of ids) g.append(opcao(id, `${e.nome}: ${e.fmt(condById(id).nivel)}`));
+    sel.append(g);
+  }
+  sel.onchange = () => mudarCond(sel.value);
+}
+function mudarCond(id) { E.cond = id; player.parar(); marcarSeletor(); render(); }
 
 function montarSeletor() {
   const box = $('sel-cerebro');
@@ -86,7 +113,10 @@ function montarSeletor() {
   }
   marcarSeletor();
 }
-function marcarSeletor() { for (const b of $('sel-cerebro').querySelectorAll('button')) b.classList.toggle('sel', b.dataset.p === E.piloto); }
+function marcarSeletor() {
+  for (const b of $('sel-cerebro').querySelectorAll('button')) b.classList.toggle('sel', b.dataset.p === E.piloto);
+  $('sel-cond').value = E.cond;
+}
 
 function montarLegenda() {
   $('legenda').innerHTML = Object.keys(CLASSES).map(k =>
@@ -100,17 +130,38 @@ function render() {
   const r = $('resumo');
   r.textContent = `${NOME_PILOTO[E.piloto]}: ${cartao.resumo}.`;
   r.className = 'resumo ' + (cartao.licenciavel ? 'ok' : 'bad');
+  $('resumo-cond').innerHTML = resumoCond();
   renderGrade($('grade'), frota, true);
   renderGrade($('grade-extras'), extras.filter(x => celula(E.piloto, x, missoes[0])), false);
   $('rodape-grade').textContent = `Cada célula: ${L.reps} corridas com as sementes ${L.seed0} a ${L.seed0 + L.reps - 1}, as mesmas para o cérebro e para a referência. ` +
     `Tolerância ${String(opc.tol).replace('.', ',')}. Pré-calculado em ${new Date(L.gerado).toLocaleString('pt-BR')}.`;
   renderPainel();
+  renderVarredura(cartao);
   renderCartao(cartao);
 }
 
+// O cartão é sempre o da licença: classes do nominal + limites de operação de toda a varredura.
 function cartaoAtual() {
-  const dados = { [E.cond]: L.pilotos[E.piloto][E.cond] }, esp = { [E.cond]: L.pilotos.especialista[E.cond] };
+  const dados = {}, esp = {};
+  for (const c of CONDICOES) if (temCond(c.id)) { dados[c.id] = L.pilotos[E.piloto][c.id]; esp[c.id] = L.pilotos.especialista[c.id]; }
   return montarCartao({ piloto: E.piloto, dados, esp, robos: frota, missoes, opc });
+}
+
+// Linha abaixo do resumo: o que a condição escolhida muda na grade em relação ao nominal.
+function resumoCond() {
+  if (E.cond === 'nominal') return 'Grade na condição nominal. Escolha uma condição para ver a grade sob aquela imprevisibilidade.';
+  const mud = {};
+  let n = 0;
+  for (const r of frota) for (const m of missoes) {
+    const c0 = classificar(celula(E.piloto, r, m, 'nominal'), celula('especialista', r, m, 'nominal'), opc), c1 = classe(r, m);
+    if (c0 !== c1) { n++; mud[c1] = (mud[c1] || 0) + 1; }
+  }
+  const nomes = { defeito: 'defeito do cérebro', limite: 'limite físico', testar: 'testar fisicamente', liberado: 'liberado' };
+  return `Grade sob <b>${esc(rotuloCond(E.cond))}</b> (cérebro e referência recebem a mesma perturbação). ` +
+    (n ? `${n} célula${n > 1 ? 's' : ''} da frota mud${n > 1 ? 'aram' : 'ou'} de classe em relação ao nominal: ` +
+         Object.entries(mud).map(([k, v]) => `${v} para ${nomes[k]}`).join(', ') + '.'
+       : 'Nenhuma célula da frota mudou de classe em relação ao nominal.') +
+    ' O cartão abaixo continua sendo o da licença (nominal + limites de operação).';
 }
 
 const iconeCache = {};
@@ -167,7 +218,8 @@ function renderPainel() {
   const b = celula(E.piloto, r, m), e = celula('especialista', r, m);
   const cls = classe(r, m);
   $('p-titulo').textContent = `${roboById(r).nome} · ${m}`;
-  $('p-missao').textContent = mis.nome + (roboById(r).frota ? '' : ' · robô que não faz parte da frota (não entra na licença)');
+  $('p-missao').textContent = mis.nome + (E.cond !== 'nominal' ? ` · condição: ${rotuloCond(E.cond)}` : '') +
+    (roboById(r).frota ? '' : ' · robô que não faz parte da frota (não entra na licença)');
   const refOk = taxa(e) >= opc.tol;
   $('p-lado').innerHTML =
     `<div class="bloco ${cls}"><b>${NOME_PILOTO[E.piloto]}</b><span class="tx">${b.ok}/${b.n}</span> chegaram<br>` +
@@ -243,7 +295,7 @@ async function rastros(p) {
       for (const k of ks) {
         const run = await novaCorrida(p, r, m, k);
         const res = run.runToEnd();
-        trilhas.push({ trail: [...run.world.trail, [run.world.x, run.world.y]], res, w: run.world, path: run.path, missao: m });
+        trilhas.push({ trail: [...run.world.trail, [run.world.x, run.world.y]], res, w: run.world, path: run.path, missao: m, obst: run.obstaculo });
         res1.push(res);
         const a = conferir(p, r, m, k, res); if (a) avisos.push(`${m}, corrida ${k + 1}: ${a}`);
       }
@@ -261,9 +313,67 @@ async function rastros(p) {
     return `<b>${m}: divergiu</b> (${Object.entries(cont).map(([d, n]) => `${n} ${rot[d][n > 1 ? 1 : 0]}`).join(', ')}; todas as ${res.length} corridas desenhadas)`;
   };
   const usadas = GRAVIDADES.filter(g => trilhas.some(t => t.res.gravidade === g));
-  $('status').innerHTML = `<b>${esc(NOME_PILOTO[p])}</b> · ${esc(roboById(r).nome)} nas 7 missões: ` + porMissao.map(linha).join(' · ') +
+  $('status').innerHTML = `<b>${esc(NOME_PILOTO[p])}</b> · ${esc(roboById(r).nome)} nas 7 missões` +
+    (E.cond !== 'nominal' ? ` (${esc(rotuloCond(E.cond))})` : '') + ': ' + porMissao.map(linha).join(' · ') +
     `<br><span class="muted">${usadas.map(g => `${marca(g)} ${TEXTO_G[g]}`).join(' · ')}</span>` +
     (avisos.length ? `<br><span class="aviso-replay">⚠ ${esc(avisos.join('; '))}</span>` : '');
+}
+
+// ---------------------------------------------------------------- varredura (4.3)
+// Um gráfico por eixo: nível no x, fração do escopo nominal mantida no y, cérebro e referência.
+function renderVarredura(c) {
+  const box = $('varreduras');
+  $('leg-cerebro').textContent = NOME_PILOTO[E.piloto].toLowerCase();
+  const escopo = frota.flatMap(r => missoes.filter(m => CLASSES[c.classes[r][m]].dentro).map(m => [r, m]));
+  const mantemE = id => escopo.filter(([r, m]) => { const e = celula('especialista', r, m, id); return taxa(e) >= opc.tol && contagem(e, 'grave') === 0; }).length / (escopo.length || 1);
+  const fe0 = mantemE('nominal');
+  box.innerHTML = c.limites.map(l => {
+    const eixo = eixoById(l.eixo);
+    const unidade = eixo.binario ? '' : eixo.fmt(1).replace(/^[\d,]+\s*/, '');
+    const pts = [{ id: 'nominal', rot: eixo.binario ? 'não' : '0', nome: 'nominal', fracB: 1, fracE: fe0, defeitos: 0 },
+      ...l.niveis.map(n => ({ id: idCondicao(eixo, n.nivel), rot: eixo.binario ? 'sim' : fmtNum(n.nivel), nome: eixo.binario ? 'com obstáculo' : eixo.fmt(n.nivel), ...n }))];
+    const iLim = l.limite ? pts.findIndex(p => p.nivel === l.limite) : 0;
+    return `<div class="varr"><h3>${esc(eixo.nome)}</h3><p class="lim">${esc(l.texto.replace(eixo.nome + ': ', ''))}${refLimite(l, true)}</p>` +
+      graficoVarredura(pts, iLim, unidade) + '</div>';
+  }).join('') || '<p class="muted">O pré-cálculo não tem condições de varredura.</p>';
+  box.onclick = ev => { const g = ev.target.closest?.('.col'); if (g) mudarCond(g.dataset.id); };
+}
+
+function graficoVarredura(pts, iLim, unidade) {
+  const W = 240, H = 136, l = 34, r = 10, t = 10, b = 30, k = pts.length;
+  const x = i => k === 1 ? (l + W - r) / 2 : l + i * (W - l - r) / (k - 1);
+  const y = v => t + (1 - v) * (H - t - b);
+  const passo = k > 1 ? (W - l - r) / (k - 1) : W - l - r;
+  const pct0 = v => `${Math.round(100 * v)}%`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="varredura">`;
+  if (iLim > 0) s += `<rect x="${x(0)}" y="${t}" width="${x(iLim) - x(0)}" height="${H - t - b}" fill="var(--c-liberado)"/>`;
+  for (const v of [0, 0.5, 1]) s += `<line x1="${l}" x2="${W - r}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(20,24,28,.12)"/>` +
+    `<text x="${l - 5}" y="${y(v) + 4}" text-anchor="end">${pct0(v)}</text>`;
+  const linha = (key, cor, tr) => `<polyline points="${pts.map((p, i) => `${x(i)},${y(p[key])}`).join(' ')}" fill="none" stroke="${cor}" stroke-width="2" ${tr}/>`;
+  s += linha('fracE', COR_E, 'stroke-dasharray="5 4"');
+  s += pts.map((p, i) => `<rect x="${x(i) - 4}" y="${y(p.fracE) - 4}" width="8" height="8" fill="${COR_E}" stroke="#fff" stroke-width="1.5"/>`).join('');
+  s += linha('fracB', COR_B, '');
+  s += pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.fracB)}" r="4.5" fill="${COR_B}" stroke="#fff" stroke-width="2"/>`).join('');
+  s += pts.map((p, i) => `<g class="col" data-id="${p.id}"><title>${esc(p.nome)}: ${NOME_PILOTO[E.piloto].toLowerCase()} mantém ${pct0(p.fracB)}, ` +
+    `referência ${pct0(p.fracE)}${p.defeitos ? ` · ${p.defeitos} defeito${p.defeitos > 1 ? 's' : ''} do cérebro` : ''} · clique para ver a grade</title>` +
+    `<rect class="hit" x="${x(i) - passo / 2}" y="0" width="${passo}" height="${H}" fill="transparent"/>` +
+    `<text x="${x(i)}" y="${H - b + 15}" text-anchor="middle" class="${p.id === E.cond ? 'sel' : ''}">${p.rot}</text></g>`).join('');
+  if (unidade) s += `<text x="${W - r}" y="${H - 2}" text-anchor="end">${esc(unidade)}</text>`;
+  return s + '</svg>';
+}
+
+// texto da referência ao lado de um limite
+function refLimite(l, curto = false) {
+  const eixo = eixoById(l.eixo);
+  // limiteEsp: maior nível em que a referência mantém todas as células do escopo
+  const perde = n => `perde ${n} ${n > 1 ? 'células' : 'célula'}`;
+  const nPerdidas = nv => Math.round((1 - nv.fracE) * (l.escopoN || 0));
+  if (eixo.binario) return l.niveis[0]?.fracE < 1 ? `; a referência também ${perde(nPerdidas(l.niveis[0]))} (limite físico, não conta)` : '';
+  const max = l.limiteEsp === eixo.niveis[eixo.niveis.length - 1];
+  const primeiraQueda = l.niveis.find(nv => nv.fracE < 1);
+  return (curto ? '; referência: ' : ' · piloto de referência: ') +
+    (l.limiteEsp ? `mantém todas até ${eixo.fmt(l.limiteEsp)}${max && !curto ? ' (maior nível testado)' : ''}`
+      : `já ${perde(nPerdidas(primeiraQueda))} em ${eixo.fmt(primeiraQueda.nivel)} (limite físico, não conta)`);
 }
 
 // ---------------------------------------------------------------- galpão animado
@@ -320,19 +430,26 @@ function desenhar() {
   drawWarehouse(ctx, WAREHOUSE, view, { highlight: m ? estacaoDe(m) : undefined });
   const run = player.run;
   if (run) {
-    const w = run.world;
+    const w = run.world, ob = run.obstaculo;
+    if (ob?.r && run.path !== run.pathOriginal) drawPath(ctx, run.pathOriginal, view, '#9aa3a9');
     drawPath(ctx, run.path, view);
+    if (ob?.r) desenharObstaculo(ob, w.t - ob.t);
     drawTrail(ctx, w.trail, view, undefined, [w.x, w.y]);
+    if (run.empurrao) desenharEmpurrao(run.empurrao, w.t);
+    if (run.pert?.ruido && !w.done) { drawTarget(ctx, run.target, view); desenharVisto(w, run.seen); }
     drawRobotAt(ctx, player.body, w, view);
     const t = w.t * DT;
     const res = w.done ? run.result() : null;
+    const desc = descPerturbacao(run);
     $('status').innerHTML = `${esc(player.rotulo)} · ` + (!res ? fmtT(t)
-      : `<b class="${res.status === 'chegou' ? 'ok' : 'bad'}">${TEXTO_G[res.gravidade]}</b> em ${fmtT(t)}`);
+      : `<b class="${res.status === 'chegou' ? 'ok' : 'bad'}">${TEXTO_G[res.gravidade]}</b> em ${fmtT(t)}`) +
+      (desc ? `<br><span class="muted">${esc(desc)}</span>` : '');
   } else if (player.trilhas) {
     // rota planejada só da missão clicada; ela é desenhada por último, por cima das outras
     const dest = player.trilhas.find(t => t.missao === player.destaque);
     if (dest) drawPath(ctx, dest.path, view);
     const ordem = [...player.trilhas.filter(t => t.missao !== player.destaque), ...player.trilhas.filter(t => t.missao === player.destaque)];
+    for (const tr of player.trilhas) if (tr.obst?.r) desenharObstaculo(tr.obst, 99, true);
     for (const tr of ordem) {
       drawTrail(ctx, tr.trail, view, COR_G[tr.res.gravidade]);
       drawRobotAt(ctx, player.body, tr.w, view, { ghost: true });
@@ -356,6 +473,69 @@ function desenhar() {
     drawPath(ctx, player.prevRun.path, view);
     drawRobotAt(ctx, player.body, { ...player.prevRun.start }, view);
   }
+  if (E.cond !== 'nominal' && m) {
+    // rótulo da condição no canto do galpão
+    const txt = rotuloCond(E.cond);
+    ctx.font = `700 ${Math.round(0.18 * view.s)}px system-ui, sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    const tw = ctx.measureText(txt).width, x0 = view.X(0) + 10, y0 = view.Y(WAREHOUSE.H) + 10;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x0 - 6, y0 - 4, tw + 12, 0.18 * view.s + 10);
+    ctx.fillStyle = COR_B; ctx.fillText(txt, x0, y0);
+  }
+}
+
+// obstáculo que surgiu; idade em passos desde que surgiu (anel de alerta no começo)
+function desenharObstaculo(o, idade, fraco = false) {
+  const { X, Y, s } = view;
+  ctx.globalAlpha = fraco ? 0.45 : 1;
+  ctx.fillStyle = C.box; ctx.strokeStyle = C.boxEdge; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(X(o.x), Y(o.y), o.r * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (!fraco && idade < 30) {
+    ctx.strokeStyle = COR_B; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(X(o.x), Y(o.y), (o.r + 0.08 + 0.004 * idade) * s, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+// seta do empurrão, no ponto em que aconteceu (velocidade somada, desenhada como 0,8 s de deslocamento)
+function desenharEmpurrao(e, t) {
+  const { X, Y, s } = view;
+  const x1 = e.x + e.vx * 0.8, y1 = e.y + e.vy * 0.8;
+  ctx.globalAlpha = t - e.t < 40 ? 1 : 0.55;
+  ctx.strokeStyle = COR_B; ctx.fillStyle = COR_B; ctx.lineWidth = Math.max(2.5, 0.04 * s);
+  ctx.beginPath(); ctx.moveTo(X(e.x), Y(e.y)); ctx.lineTo(X(x1), Y(y1)); ctx.stroke();
+  const a = Math.atan2(-(y1 - e.y), x1 - e.x), h = 0.14 * s;
+  ctx.beginPath(); ctx.moveTo(X(x1), Y(y1));
+  ctx.lineTo(X(x1) - h * Math.cos(a - 0.45), Y(y1) - h * Math.sin(a - 0.45));
+  ctx.lineTo(X(x1) - h * Math.cos(a + 0.45), Y(y1) - h * Math.sin(a + 0.45));
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// ponto-alvo que o piloto recebeu (com ruído), ligado ao robô
+function desenharVisto(w, seen) {
+  const { X, Y, s } = view;
+  ctx.strokeStyle = COR_B; ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(X(w.x), Y(w.y)); ctx.lineTo(X(seen.wx), Y(seen.wy)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(X(seen.wx), Y(seen.wy), Math.max(5, 0.07 * s), 0, Math.PI * 2); ctx.stroke();
+}
+
+// o que a perturbação fez nesta corrida, em uma linha
+function descPerturbacao(run) {
+  const p = run.pert;
+  if (!p) return '';
+  const x = [];
+  if (p.giro) x.push(`saída girada ${run.giroAplicado >= 0 ? '+' : '−'}${Math.abs(Math.round(run.giroAplicado))}° (sorteio entre −${p.giro}° e +${p.giro}°)`);
+  if (p.empurrao) x.push(`empurrão de ${fmtNum(p.empurrao)} m/s aos ${fmtNum(PASSO_EMPURRAO * DT)} s` + (run.empurrao ? ' (seta laranja)' : ''));
+  if (p.ruido) x.push(`ruído de até ±${p.ruido}° na direção do ponto-alvo: o anel laranja é o que o piloto recebe, o ponto roxo é o real`);
+  if (p.atraso) x.push(`atraso de ${fmtNum(p.atraso)} s: cada comando é executado ${Math.round(p.atraso / DT)} passos depois de dado`);
+  if (p.obstaculo) {
+    const o = run.obstaculo, quando = `aos ${fmtNum(PASSO_OBSTACULO * DT)} s`;
+    x.push(!o ? `um obstáculo surge na rota ${quando}` : o.semEspaco ? `o obstáculo não surgiu: ${quando} o robô já estava perto do destino`
+      : run.bloqueado ? `obstáculo surgiu ${quando} e não há rota possível: corrida parada (bloqueado)`
+      : `obstáculo surgiu ${quando}; rota replanejada (a cinza é a original)`);
+  }
+  return x.join(' · ');
 }
 
 for (const k of [1, 2, 4]) {
@@ -397,14 +577,19 @@ function renderCartao(c = cartaoAtual()) {
       <span class="grow"></span>
       <span class="selo-lic ${c.licenciavel ? 'ok' : 'bad'}">${c.licenciavel ? 'Licenciável para a frota' : 'Licença com restrições'}</span>
     </div>
-    <p class="muted small">Condição avaliada: nominal · tolerância ${String(c.tol).replace('.', ',')} · ${L.reps} corridas por célula ·
-      gerada automaticamente a partir do pré-cálculo, sem edição manual.</p>
+    <p class="muted small">Classes avaliadas na condição nominal; limites de operação por varredura de
+      ${CONDICOES.filter(x => x.eixo && temCond(x.id)).length} condições de imprevisibilidade · tolerância ${String(c.tol).replace('.', ',')} ·
+      ${L.reps} corridas por célula · gerada automaticamente a partir do pré-cálculo, sem edição manual.</p>
 
     <h3>Liberado para</h3>
     <p>${c.bloqueado.length + c.fora.length === 0
       ? '<b>Todos os robôs da frota, em todas as missões.</b>'
       : `<b>${nRobos - exc.size} de ${nRobos} robôs da frota em todas as missões.</b> ` +
         `Exceções: ${esc(c.liberadoTexto.replace(/^todos os robôs, todas as missões, exceto: /, ''))}.`}</p>
+
+    <h3>Limites de operação</h3>
+    ${lista(c.limites.map(l => `<li>${esc(l.texto)}${esc(refLimite(l))}.</li>`), 'O pré-cálculo não tem varredura.')}
+    ${c.limites.length ? '<p class="muted small" style="margin-top:0">Cada limite vale sobre os robôs e missões liberados acima; onde nem o piloto de referência aguenta a perturbação, é limite físico e não conta contra o cérebro.</p>' : ''}
 
     <h3>Bloqueado (defeito do cérebro)</h3>
     ${lista(porRobo(c.bloqueado).map(g =>
@@ -421,7 +606,7 @@ function renderCartao(c = cartaoAtual()) {
       'Nenhum na condição nominal.')}
 
     <h3>O que falta treinar</h3>
-    ${lista(c.treinar.map(t => `<li>${esc(t[0].toUpperCase() + t.slice(1))}.</li>`), 'Nada na condição nominal.')}
+    ${lista(c.treinar.map(t => `<li>${esc(t[0].toUpperCase() + t.slice(1))}.</li>`), 'Nada.')}
 
     <div class="assinaturas">
       <div>Certificadora<br><span class="muted">nome e data</span></div>
