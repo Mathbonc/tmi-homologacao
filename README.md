@@ -1,6 +1,8 @@
 # Banca de homologação de robôs com IA
 
-**Link do experimento:** https://SEU-USUARIO.github.io/banca-homologacao-robos/
+**Projeto final, licenciador de cérebros:** https://mathbonc.github.io/tmi-homologacao/licenca.html
+
+**Link do experimento:** https://mathbonc.github.io/tmi-homologacao/
 
 Experimento do movimento 3 de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2).
 
