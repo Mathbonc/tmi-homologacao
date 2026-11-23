@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 2 concluídas; próxima: etapa 3 · **37% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 3 concluídas; próxima: etapa 4 · **42% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -376,7 +376,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 0. Preparar | 2% | 30 min | — |
 | ☑ | 1. Medição: gravidade, perturbações, pré-cálculo | 15% | 3 h | tabelas no terminal |
 | ☑ | 2. Página da licença: grade, replay, cartão | 20% | 3 a 4 h | **já é apresentável (ponto de segurança)** |
-| ☐ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
+| ☑ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
 | ☐ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
 | ☐ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
 | ☐ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
@@ -442,6 +442,8 @@ travar, segue sem ele e volta só se sobrar tempo.
   outro computador. Atualizar o link no README.
 - Gravar um vídeo de tela de 1 a 2 minutos dos passos 1 a 3 do roteiro (seção 5): é a reserva v1.
 - **Aceite:** link público abre fora da máquina do Matheus e mostra a licença em menos de 5 s.
+- *Aceita em 22/11: link aberto pelo Matheus em outra rede. O vídeo de reserva v1 foi para o
+  backlog por decisão dele; fica só o vídeo final da etapa 9.*
 
 ### Etapa 4 — Imprevisibilidades e varredura (2 a 3 h)
 
