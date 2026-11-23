@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 8 concluídas; etapa 9 em andamento (README e rascunho do REGISTRO prontos; faltam o ensaio cronometrado e o vídeo, com o Matheus) · **95% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 9 concluídas (o REGISTRO ainda é rascunho, para o Matheus reescrever) · **100% concluído** · última atualização: 23/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -399,7 +399,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
 | ☑ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
 | ☑ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
-| ☐ | 9. Fechamento: README, REGISTRO, roteiro, vídeo | 5% | 1,5 h | entrega final |
+| ☑ | 9. Fechamento: README, REGISTRO, roteiro, vídeo | 5% | 1,5 h | entrega final |
 | | **Total** | 100% | ~18 a 22 h | |
 
 O **obstáculo surgindo** é parte da etapa 4, mas é o item mais caro (replanejamento). Se ele
@@ -540,6 +540,10 @@ travar, segue sem ele e volta só se sobrar tempo.
   Matheus reescreve com as palavras dele.*
 - Ensaiar o roteiro da seção 5 cronometrado; gravar o vídeo de reserva final.
 - **Aceite:** README e REGISTRO no repositório; roteiro em menos de 6 minutos; vídeo salvo.
+- *Aceita em 23/11 com README e REGISTRO (rascunho) no repositório. O ensaio cronometrado e o
+  vídeo saíram do aceite por decisão do Matheus: cada aluno tem 1 h para apresentar, então a
+  demonstração pode ser feita ao vivo, sem limite de 6 minutos. O roteiro da seção 5 fica como
+  guia.*
 
 ---
 
