@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 8 concluídas; próxima: etapa 9 · **95% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 8 concluídas; etapa 9 em andamento (README e rascunho do REGISTRO prontos; faltam o ensaio cronometrado e o vídeo, com o Matheus) · **95% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -567,6 +567,7 @@ docs/
   index.html, app.js      o experimento (congelado; só ganha um link)
   licenca.html            o projeto (novo)
   licenca.js              página do projeto (novo)
+  montador-worker.js      Web Worker do montador (etapa 8, novo)
   painel.html, painel.js  painel do experimento (congelado)
   sandbox.html            depuração
   style.css               compartilhado
@@ -574,7 +575,7 @@ docs/
     physics.js            + impact, minClear (aditivo)
     episode.js            + opts de perturbação (aditivo)
     licenca.js            classificação, risco, varredura, cartão (novo)
-    worker.js             corridas ao vivo (etapa 8, novo)
+    montador.js           licença de um robô montado (etapa 8, novo)
     parts.js, warehouse.js, planner.js, expert.js, brain.js, pilots.js, draw.js, banca.js
   model/
     brains.json           os 4 cérebros do experimento (congelado)
