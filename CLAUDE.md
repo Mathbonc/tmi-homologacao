@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 5 concluídas; próxima: etapa 6 · **65% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 6 concluídas; próxima: etapa 7 · **77% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -338,6 +338,17 @@ data, guardado no `localStorage`; exportável em JSON):
 
 O cartão mostra de onde veio cada restrição (certificadora, fabricante ou fábrica).
 
+*Como ficou (etapa 6, 22/11), três decisões de implementação:*
+- *Com 6 corridas por célula, tolerância 0,9 e 1,0 são iguais (5/6 = 83%): as duas exigem 6/6. O
+  seletor mostra isso ("nenhuma falha em 6"). Para haver exigência maior de verdade, a gravidade
+  proibida tem um degrau a mais: grave < qualquer colisão < qualquer colisão ou quase-acidente.*
+- *A fábrica é "mais exigente" pela gravidade proibida (nunca menos que a da certificadora), não
+  pela tolerância, pelo motivo acima.*
+- *Os níveis mínimos valem por célula: uma célula que tem defeito em algum nível até o mínimo sai
+  da licença como bloqueio da certificadora (onde a referência também falha, é limite físico e
+  fica). A licença encolhe em vez de só reprovar o cérebro inteiro, coerente com "liberar com
+  restrição". Com os mínimos padrão (ruído 10°, atraso 0,1 s) nenhum cérebro perde célula.*
+
 ### 4.6 Comparação de versões
 
 Seletor "comparar com": mostra a grade como diferença entre duas versões (verde = passou a
@@ -385,7 +396,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 3. Publicar e ensaiar o mínimo | 5% | 45 min | link público + vídeo de reserva v1 |
 | ☑ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
 | ☑ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
-| ☐ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
+| ☑ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
 | ☐ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
 | ☐ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
 | ☐ | 9. Fechamento: README, REGISTRO, roteiro, vídeo | 5% | 1,5 h | entrega final |

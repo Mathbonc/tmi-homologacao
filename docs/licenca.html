@@ -43,6 +43,28 @@
   .defeito  { background: var(--c-defeito);  color: var(--t-defeito); }
   .limite   { background: var(--c-limite);   color: var(--t-limite); }
   .extras-tit { margin: 14px 0 2px; }
+  tr.fora-escopo td.cel, td.cel.fora-escopo { opacity: .3; }
+  td.cel.min-bloq { outline: 2px dashed var(--t-defeito); outline-offset: -4px; }
+  tr.fora-escopo th.robo { color: var(--soft); text-decoration: line-through; }
+  th.fora-escopo { text-decoration: line-through; opacity: .5; }
+
+  /* camadas (4.5) */
+  .camadas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 900px) { .camadas { grid-template-columns: minmax(0, 1fr); } }
+  .camada { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .camada h3 { margin: 0; font-size: 16px; }
+  .camada .quem { margin: 0; font-size: 13px; }
+  .camada label { display: flex; gap: 6px; align-items: baseline; font-size: 14px; }
+  .camada select, .camada input[type=text] { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
+  .camada fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+  .camada legend { font-weight: 600; font-size: 13px; padding: 0; margin-bottom: 2px; }
+  .camada .assinar { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; border-top: 1px dashed var(--line); }
+  .camada .assinar input { flex: 1; min-width: 0; }
+  .camada .ass { font-size: 13px; }
+  .camada .ass.ok { color: var(--ok); } .camada .ass.velha { color: var(--warn); }
+  .origem { font-size: 12px; color: var(--soft); white-space: nowrap; }
+  .assinaturas .nome { font-weight: 600; }
+  .assinaturas .velha { color: var(--warn); }
   td.cel .gi { font-size: 12px; margin-left: 2px; vertical-align: 1px; }
   .legenda .leg-g { flex-basis: 100%; }
   .legenda .gi-leg { font-weight: 700; }
@@ -179,10 +201,25 @@
     <div id="varreduras" class="varreduras"></div>
   </div>
 
+  <div class="card no-print" id="camadas-card">
+    <div class="row" style="align-items:baseline">
+      <h2>Camadas da licença</h2>
+      <span class="grow"></span>
+      <button id="camadas-padrao" class="small">Restaurar padrão</button>
+    </div>
+    <p class="muted small" style="margin:0 0 8px">Três partes decidem a licença, e ela é a <b>interseção</b> das três. A
+      certificadora fixa o mínimo para todo cérebro; o fabricante declara o que o cérebro dele se propõe a pilotar (uma
+      limitação declarada sai do escopo, não é defeito); a fábrica diz que robôs e missões usa de verdade e pode exigir
+      mais. Cada parte assina com nome e data; se a configuração mudar depois, a assinatura deixa de valer.
+      As escolhas ficam guardadas neste navegador.</p>
+    <div id="camadas" class="camadas"></div>
+  </div>
+
   <div class="card" id="cartao"></div>
   <div class="row no-print" style="margin-bottom:30px">
     <button id="imprimir" class="primary">Imprimir / salvar PDF</button>
-    <span class="muted small">imprime só o cartão da licença</span>
+    <button id="exportar">Exportar licença (JSON)</button>
+    <span class="muted small">imprime só o cartão da licença, com as assinaturas</span>
   </div>
 
 </div>

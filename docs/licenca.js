@@ -8,8 +8,10 @@ import { drawWarehouse, drawPath, drawTrail, drawRobotAt, drawRobot, drawTarget,
 import { loadPilot, loadModel, BRAIN_NAMES } from './core/pilots.js';
 import {
   ROBOS, roboById, corpoDe, condById, classificar, montarCartao, taxa, riscoDe, piorGravidade, contagem,
-  GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao, descTeste
+  GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao, descTeste,
+  camadasPadrao, CLASSES_ROBO, PROIBIDAS, NOME_CAMADA, seMantem
 } from './core/licenca.js';
+import { bodyClass } from './core/parts.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -18,7 +20,7 @@ const pct = x => `${Math.round(100 * x)}%`;
 const NOME_PILOTO = { especialista: 'Piloto de referência', cerebro1: 'Cérebro 1', cerebro2: 'Cérebro 2', cerebro3: 'Cérebro 3', cerebro4: 'Cérebro 4' };
 const SIMBOLO = { liberado: '✓', testar: '!', defeito: '✕', limite: '–' };
 const DESC_CLASSE = {
-  liberado: 'cérebro ≥ 90%, sem colisão grave',
+  liberado: 'cérebro dentro da tolerância, sem a gravidade proibida',
   testar: 'liberado, mas com falha leve, quase-acidente ou no último nível antes de um limite',
   defeito: 'a referência consegue, o cérebro não',
   limite: 'nem a referência consegue'
@@ -135,8 +137,9 @@ function montarLegenda() {
 // ---------------------------------------------------------------- render geral
 function render() {
   gravarHash();
-  const cartao = cartaoAtual();
+  const cartao = cartaoVig = cartaoAtual();
   bordasCartao = cartao.bordas;
+  Object.assign(opc, { tol: cartao.tol, proibida: cartao.proibida });   // as camadas decidem
   const r = $('resumo');
   r.textContent = `${NOME_PILOTO[E.piloto]}: ${cartao.resumo}.`;
   r.className = 'resumo ' + (cartao.licenciavel ? 'ok' : 'bad');
@@ -147,14 +150,16 @@ function render() {
     `Tolerância ${String(opc.tol).replace('.', ',')}. Pré-calculado em ${new Date(L.gerado).toLocaleString('pt-BR')}.`;
   renderPainel();
   renderVarredura(cartao);
+  renderCamadas();
   renderCartao(cartao);
 }
+let cartaoVig = null;
 
 // O cartão é sempre o da licença: classes do nominal + limites de operação de toda a varredura.
 function cartaoAtual() {
   const dados = {}, esp = {};
   for (const c of CONDICOES) if (temCond(c.id)) { dados[c.id] = L.pilotos[E.piloto][c.id]; esp[c.id] = L.pilotos.especialista[c.id]; }
-  return montarCartao({ piloto: E.piloto, dados, esp, robos: frota, missoes, opc });
+  return montarCartao({ piloto: E.piloto, dados, esp, robos: frota, missoes, opc, camadas: camadasDe(E.piloto) });
 }
 
 // Linha abaixo do resumo: o que a condição escolhida muda na grade em relação ao nominal.
@@ -192,10 +197,13 @@ function renderGrade(tab, robos, cabecalho) {
   if (!robos.length) return;
   const thead = tab.createTHead().insertRow();
   thead.append(document.createElement('th'));
+  const mFora = cabecalho ? cartaoVig.missoesFora : [];
+  const rFora = cabecalho ? Object.fromEntries(cartaoVig.foraEscopo.map(i => [i.robo, i])) : {};
   for (const m of MISSIONS) {
     const th = document.createElement('th');
     th.innerHTML = cabecalho ? `${m.id}<small>${esc(curtoMissao(m))}</small>` : '';
-    th.title = m.nome;
+    th.title = m.nome + (mFora.includes(m.id) ? ' · fora do escopo: a fábrica usuária não usa esta missão' : '');
+    if (mFora.includes(m.id)) th.className = 'fora-escopo';
     thead.append(th);
   }
   const tb = tab.createTBody();
@@ -203,18 +211,21 @@ function renderGrade(tab, robos, cabecalho) {
     const tr = tb.insertRow();
     const th = document.createElement('th'); th.className = 'robo';
     th.append(iconeRobo(r), roboById(r).nome);
+    if (rFora[r]) { tr.className = 'fora-escopo'; th.title = `Fora do escopo (${NOME_CAMADA[rFora[r].origem]}): ${rFora[r].motivo}`; }
     tr.append(th);
     for (const m of missoes) {
       const b = celula(E.piloto, r, m), e = celula('especialista', r, m);
       const cls = classe(r, m);
       const td = tr.insertCell();
-      td.className = `cel ${cls}` + (E.robo === r && E.missao === m ? ' sel' : '');
+      const bMin = cabecalho && E.cond === 'nominal' ? cartaoVig.bloqueado.find(i => i.origem === 'minimo' && i.robo === r && i.missao === m) : null;
+      td.className = `cel ${cls}` + (E.robo === r && E.missao === m ? ' sel' : '') + (mFora.includes(m) ? ' fora-escopo' : '') + (bMin ? ' min-bloq' : '');
       const g = piorGravidade(b);
       td.innerHTML = `${pct(taxa(b))} ${SIMBOLO[cls]}` + (ICONE_G[g] ? `<span class="gi">${ICONE_G[g]}</span>` : '');
       td.title = `${roboById(r).nome} · ${missionById(m).nome}\n${CLASSES[cls].nome}` +
         (ehBorda(r, m) ? ' (último nível antes do limite: no nível seguinte vira defeito)' : '') + '\n' +
         `${NOME_PILOTO[E.piloto]}: ${b.ok}/${b.n} chegaram\nReferência: ${e.ok}/${e.n} chegaram\n` +
-        `Risco: ${fmtRisco(riscoDe(b))} · pior caso: ${GRAV_TEXTO[g]}`;
+        `Risco: ${fmtRisco(riscoDe(b))} · pior caso: ${GRAV_TEXTO[g]}` +
+        (bMin ? `\nBloqueada pela certificadora: não aguenta ${eixoById(bMin.eixo).curto} de ${eixoById(bMin.eixo).fmt(bMin.nivel)} (mínimo exigido)` : '');
       td.onclick = () => { E.robo = r; E.missao = m; player.parar(); render(); };
     }
   }
@@ -337,8 +348,8 @@ async function rastros(p) {
 function renderVarredura(c) {
   const box = $('varreduras');
   $('leg-cerebro').textContent = NOME_PILOTO[E.piloto].toLowerCase();
-  const escopo = frota.flatMap(r => missoes.filter(m => CLASSES[c.classes[r][m]].dentro).map(m => [r, m]));
-  const mantemE = id => escopo.filter(([r, m]) => { const e = celula('especialista', r, m, id); return taxa(e) >= opc.tol && contagem(e, 'grave') === 0; }).length / (escopo.length || 1);
+  const escopo = c.robos.flatMap(r => c.missoes.filter(m => CLASSES[c.classes[r][m]].dentro).map(m => [r, m]));
+  const mantemE = id => escopo.filter(([r, m]) => seMantem(celula('especialista', r, m, id), opc.tol, opc.proibida)).length / (escopo.length || 1);
   const fe0 = mantemE('nominal');
   box.innerHTML = c.limites.map(l => {
     const eixo = eixoById(l.eixo);
@@ -559,18 +570,140 @@ for (const k of [1, 2, 4]) {
   $('velocidades').append(b);
 }
 
+// ---------------------------------------------------------------- camadas (4.5)
+// Estado das camadas e assinaturas, guardado no navegador (localStorage pode não existir: aí
+// tudo funciona, só não fica guardado). A certificadora e a fábrica valem para todos os cérebros;
+// o fabricante é um por cérebro.
+const ARMAZ = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } }
+};
+const CHAVE_CAM = 'licenciador.camadas.v1', CHAVE_ASS = 'licenciador.assinaturas.v1';
+const CAMADAS = ['certificadora', 'fabricante', 'fabrica'];
+const TITULO_CAMADA = { certificadora: 'Certificadora', fabricante: 'Fabricante do cérebro', fabrica: 'Fábrica usuária' };
+
+function estadoPadrao() {
+  const p = camadasPadrao();
+  return { certificadora: p.certificadora, fabrica: p.fabrica, fabricantes: {} };
+}
+function carregarCamadas() {
+  const base = estadoPadrao(), s = ARMAZ.get(CHAVE_CAM);
+  if (!s || typeof s !== 'object') return base;
+  const lista = (v, validos) => Array.isArray(v) ? v.filter(x => validos.includes(x)) : null;
+  const c = s.certificadora || {};
+  if (typeof c.tol === 'number') base.certificadora.tol = c.tol;
+  if (PROIBIDAS[c.proibida]) base.certificadora.proibida = c.proibida;
+  if (c.minimos && typeof c.minimos === 'object') base.certificadora.minimos = Object.fromEntries(
+    Object.entries(c.minimos).filter(([e, v]) => eixoById(e) && eixoById(e).niveis.includes(v)));
+  const f = s.fabrica || {};
+  base.fabrica.robos = lista(f.robos, frota) ?? base.fabrica.robos;
+  base.fabrica.missoes = lista(f.missoes, missoes) ?? base.fabrica.missoes;
+  base.fabrica.proibida = PROIBIDAS[f.proibida] && f.proibida !== 'nenhuma' ? f.proibida : null;
+  for (const [p, v] of Object.entries(s.fabricantes || {})) {
+    const cl = lista(v?.classes, Object.keys(CLASSES_ROBO));
+    if (BRAIN_NAMES.includes(p) && cl) base.fabricantes[p] = { classes: cl };
+  }
+  return base;
+}
+let cam = carregarCamadas();
+let assinaturas = ARMAZ.get(CHAVE_ASS) || {};
+const avisoAss = {};
+
+const fabricanteDe = p => (cam.fabricantes[p] ||= { classes: [...camadasPadrao().fabricante.classes] });
+const camadasDe = p => ({ certificadora: cam.certificadora, fabricante: fabricanteDe(p), fabrica: cam.fabrica });
+const configCamada = (k, p) => JSON.stringify(camadasDe(p)[k]);
+const assDe = p => assinaturas[p] || {};
+const assValida = (k, p) => { const a = assDe(p)[k]; return !!a && a.config === configCamada(k, p); };
+const alternar = (arr, x, on) => { const i = arr.indexOf(x); if (on && i < 0) arr.push(x); if (!on && i >= 0) arr.splice(i, 1); };
+const fmtData = iso => new Date(iso).toLocaleDateString('pt-BR');
+
+function mudarCamada(t) {
+  const d = t.dataset || {};
+  if (d.cam === 'certificadora') {
+    const c = cam.certificadora;
+    if (d.campo === 'tol') c.tol = +t.value;
+    else if (d.campo === 'proibida') c.proibida = t.value;
+    else if (d.campo === 'min') { if (t.value) c.minimos[d.eixo] = +t.value; else delete c.minimos[d.eixo]; }
+  } else if (d.cam === 'fabricante') alternar(fabricanteDe(E.piloto).classes, d.classe, t.checked);
+  else if (d.cam === 'fabrica') {
+    if (d.robo) alternar(cam.fabrica.robos, d.robo, t.checked);
+    else if (d.missao) alternar(cam.fabrica.missoes, d.missao, t.checked);
+    else if (d.campo === 'proibida') cam.fabrica.proibida = t.value || null;
+  } else return;
+  ARMAZ.set(CHAVE_CAM, cam);
+  render();
+}
+
+function assinar(k) {
+  const nome = ($('nome-' + k).value || '').trim();
+  if (!nome) { avisoAss[k] = 'Escreva o nome de quem assina.'; render(); return; }
+  delete avisoAss[k];
+  (assinaturas[E.piloto] ||= {})[k] = { nome, data: new Date().toISOString(), config: configCamada(k, E.piloto) };
+  ARMAZ.set(CHAVE_ASS, assinaturas);
+  render();
+}
+
+function renderCamadas() {
+  const box = $('camadas');
+  // guarda o que já foi digitado nos campos de nome (o painel é redesenhado a cada mudança)
+  const digitado = Object.fromEntries(CAMADAS.map(k => [k, document.getElementById('nome-' + k)?.value || '']));
+  const sel = (dados, opcoes, atual) => `<select ${dados}>` + opcoes.map(([v, t]) =>
+    `<option value="${v}"${String(v) === String(atual ?? '') ? ' selected' : ''}>${esc(t)}</option>`).join('') + '</select>';
+  const caixa = (dados, on, txt, dica = '') => `<label${dica ? ` title="${esc(dica)}"` : ''}><input type="checkbox" ${dados}${on ? ' checked' : ''}> ${esc(txt)}</label>`;
+  const blocoAss = k => {
+    const a = assDe(E.piloto)[k], v = assValida(k, E.piloto);
+    const st = avisoAss[k] ? `<div class="ass velha">${esc(avisoAss[k])}</div>`
+      : !a ? '<div class="ass muted">Ainda não assinada.</div>'
+      : v ? `<div class="ass ok">✓ Assinada por ${esc(a.nome)} em ${fmtData(a.data)}.</div>`
+      : `<div class="ass velha">Assinada por ${esc(a.nome)} em ${fmtData(a.data)}, mas a configuração mudou depois: assine de novo.</div>`;
+    return st + `<div class="assinar"><input type="text" id="nome-${k}" maxlength="60" placeholder="nome de quem assina" value="${esc(digitado[k])}">` +
+      `<button data-assinar="${k}">Assinar</button></div>`;
+  };
+  const c = cam.certificadora, f = fabricanteDe(E.piloto), u = cam.fabrica;
+  // com n corridas por célula, a tolerância vira "quantas falhas em n são aceitas"
+  const falhas = t => Math.floor(L.reps * (1 - t) + 1e-9);
+  const tols = [0.6, 0.8, 0.9, 1].map(t => [t, `${fmtNum(t)} · ${falhas(t) ? `aceita ${falhas(t)} falha${falhas(t) > 1 ? 's' : ''}` : 'nenhuma falha'} em ${L.reps}` + (t === TOL_PADRAO ? ' (padrão)' : '')]);
+  const robosDaClasse = cls => frota.filter(r => bodyClass(corpoDe(r)) === cls);
+  box.innerHTML =
+    `<div class="camada"><h3>Certificadora</h3><p class="quem muted">outorgada pelo governo · o mínimo, para todos os cérebros</p>` +
+      `<label>Tolerância ${sel('data-cam="certificadora" data-campo="tol"', tols, c.tol)}</label>` +
+      `<label>Gravidade proibida ${sel('data-cam="certificadora" data-campo="proibida"', Object.entries(PROIBIDAS), c.proibida)}</label>` +
+      `<fieldset><legend>Níveis mínimos que todo cérebro tem que aguentar</legend>` +
+      EIXOS.map(e => `<label>${esc(e.curto)} ${sel(`data-cam="certificadora" data-campo="min" data-eixo="${e.id}"`,
+        [['', '—'], ...e.niveis.map(n => [n, e.binario ? 'exigido' : e.fmt(n)])], c.minimos[e.id])}</label>`).join('') +
+      `</fieldset>${blocoAss('certificadora')}</div>` +
+    `<div class="camada"><h3>Fabricante do ${esc(NOME_PILOTO[E.piloto].toLowerCase())}</h3><p class="quem muted">declara o escopo: que tipos de robô o cérebro se propõe a pilotar</p>` +
+      `<fieldset><legend>O cérebro pilota robôs…</legend>` +
+      Object.entries(CLASSES_ROBO).filter(([cls]) => robosDaClasse(cls).length).map(([cls, txt]) =>
+        caixa(`data-cam="fabricante" data-classe="${cls}"`, f.classes.includes(cls), txt, robosDaClasse(cls).map(r => roboById(r).nome).join(', '))).join('') +
+      `</fieldset><p class="muted small" style="margin:0">Desmarcar declara uma limitação: aqueles robôs saem do escopo da licença em vez de contar como defeito.</p>` +
+      `${blocoAss('fabricante')}</div>` +
+    `<div class="camada"><h3>Fábrica usuária</h3><p class="quem muted">a frota e as missões que ela usa de verdade</p>` +
+      `<fieldset><legend>Robôs da frota</legend>${frota.map(r => caixa(`data-cam="fabrica" data-robo="${r}"`, u.robos.includes(r), roboById(r).nome)).join('')}</fieldset>` +
+      `<fieldset><legend>Missões</legend>${MISSIONS.map(m => caixa(`data-cam="fabrica" data-missao="${m.id}"`, u.missoes.includes(m.id), m.id, m.nome)).join('')}</fieldset>` +
+      `<label>Gravidade proibida ${sel('data-cam="fabrica" data-campo="proibida"', [['', 'a da certificadora'], ['colisao', PROIBIDAS.colisao], ['quase', PROIBIDAS.quase]], u.proibida)}</label>` +
+      `<p class="muted small" style="margin:0">Pode ser mais exigente que a certificadora, nunca menos.</p>` +
+      `${blocoAss('fabrica')}</div>`;
+  box.onchange = ev => mudarCamada(ev.target);
+  box.onclick = ev => { const k = ev.target?.dataset?.assinar; if (k) assinar(k); };
+}
+
+$('camadas-padrao').onclick = () => { cam = estadoPadrao(); ARMAZ.set(CHAVE_CAM, cam); render(); };
+
 // ---------------------------------------------------------------- cartão da licença (4.4)
 const juntar = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' e ' + xs[xs.length - 1];
 
 // agrupa itens [{robo, missao, ...}] por robô: "Empilhadeira: todas as missões"
-function porRobo(itens) {
+function porRobo(itens, nMissoes = missoes.length) {
   const g = {};
   for (const i of itens) (g[i.robo] ||= []).push(i);
   return Object.entries(g).map(([r, xs]) => ({
     robo: r, nome: roboById(r).nome, itens: xs,
-    missoesTexto: xs.length === missoes.length ? 'todas as missões' : juntar(xs.map(i => i.missao))
+    missoesTexto: xs.length === nMissoes ? 'todas as missões' : juntar(xs.map(i => i.missao))
   }));
 }
+
+const tag = k => `<span class="origem">· ${NOME_CAMADA[k]}</span>`;
 
 function renderCartao(c = cartaoAtual()) {
   const hoje = new Date().toLocaleDateString('pt-BR');
@@ -581,37 +714,80 @@ function renderCartao(c = cartaoAtual()) {
     return a === b ? pct(a) : `${pct(a)} a ${pct(b)}`;
   };
   const lista = (xs, vazio) => xs.length ? `<ul>${xs.join('')}</ul>` : `<p class="muted">${vazio}</p>`;
-  const nRobos = frota.length;
+  const nR = c.robos.length, todasM = c.missoes.length === missoes.length;
+  const reduzido = c.foraEscopo.length > 0 || c.missoesFora.length > 0;
   const exc = new Set([...c.bloqueado, ...c.fora].map(i => i.robo));
+  const deQuem = reduzido ? 'do escopo' : 'da frota';
+  const ondeM = todasM ? 'todas as missões' : `as missões ${juntar(c.missoes)}`;
+  const bloqNom = c.bloqueado.filter(i => i.origem !== 'minimo'), bloqMin = c.bloqueado.filter(i => i.origem === 'minimo');
+  const nCel = n => `${n} célula${n > 1 ? 's' : ''}`;
+  const motivoNao = [bloqNom.length ? `${nCel(bloqNom.length)} com defeito` : '',
+    bloqMin.length ? `${nCel(bloqMin.length)} abaixo do mínimo da certificadora` : '', !nR || !c.missoes.length ? 'escopo vazio' : ''].filter(Boolean).join('; ');
+  // bloqueios por mínimo, agrupados por eixo e nível
+  const gMin = {};
+  for (const i of bloqMin) (gMin[`${i.eixo}|${i.nivel}`] ||= []).push(i);
+  const itensMin = Object.values(gMin).map(xs => {
+    const e = eixoById(xs[0].eixo);
+    return `<li>${porRobo(xs, c.missoes.length).map(g => `<b>${esc(g.nome)}</b> em ${g.missoesTexto}`).join('; ')}: com ${esc(e.curto)}` +
+      `${e.binario ? '' : ' de ' + esc(e.fmt(xs[0].nivel))} o cérebro chega em ${faixa(xs)}, e a referência aguenta. ${tag('certificadora')}</li>`;
+  });
+  const selo = c.licenciavel ? (reduzido ? 'Licenciável no escopo das camadas' : 'Licenciável para a frota') : `Não licenciável: ${motivoNao}`;
+
+  // fora do escopo, agrupado por origem
+  const foraItens = [];
+  const porClasse = {};
+  for (const i of c.foraEscopo.filter(i => i.origem === 'fabricante')) (porClasse[i.classe] ||= []).push(roboById(i.robo).nome);
+  for (const [cls, nomes] of Object.entries(porClasse))
+    foraItens.push(`<li><b>${esc(juntar(nomes))}</b>: limitação declarada pelo fabricante do cérebro (não pilota robôs ${esc(CLASSES_ROBO[cls])}). ${tag('fabricante')}</li>`);
+  const daFabrica = c.foraEscopo.filter(i => i.origem === 'fabrica').map(i => roboById(i.robo).nome);
+  if (daFabrica.length) foraItens.push(`<li><b>${esc(juntar(daFabrica))}</b>: não ${daFabrica.length > 1 ? 'fazem' : 'faz'} parte da frota da fábrica usuária. ${tag('fabrica')}</li>`);
+  if (c.missoesFora.length) foraItens.push(`<li>Missões <b>${juntar(c.missoesFora)}</b>: a fábrica usuária não usa. ${tag('fabrica')}</li>`);
+
+  const assin = CAMADAS.map(k => {
+    const a = assDe(c.piloto)[k], v = assValida(k, c.piloto);
+    return `<div>${TITULO_CAMADA[k]}<br>` + (!a ? '<span class="muted">nome e data</span>'
+      : `<span class="nome${v ? '' : ' velha'}">${esc(a.nome)}</span>, ${fmtData(a.data)}` +
+        (v ? '' : '<br><span class="velha small">assinou outra configuração: não vale para esta</span>')) + '</div>';
+  }).join('');
 
   $('cartao').innerHTML = `
     <div class="row" style="align-items:baseline">
       <h2>Licença de operação · ${esc(NOME_PILOTO[c.piloto])}</h2>
       <span class="grow"></span>
-      <span class="selo-lic ${c.licenciavel ? 'ok' : 'bad'}">${c.licenciavel ? 'Licenciável para a frota' : 'Licença com restrições'}</span>
+      <span class="selo-lic ${c.licenciavel ? 'ok' : 'bad'}">${esc(selo)}</span>
     </div>
     <p class="muted small">Classes avaliadas na condição nominal; limites de operação por varredura de
-      ${CONDICOES.filter(x => x.eixo && temCond(x.id)).length} condições de imprevisibilidade · tolerância ${String(c.tol).replace('.', ',')} ·
+      ${CONDICOES.filter(x => x.eixo && temCond(x.id)).length} condições de imprevisibilidade · tolerância ${fmtNum(c.tol)}
+      (${NOME_CAMADA[c.origemTol || 'certificadora']}) · gravidade proibida: ${PROIBIDAS[c.proibida]} (${NOME_CAMADA[c.origemProibida || 'certificadora']}) ·
       ${L.reps} corridas por célula · gerada automaticamente a partir do pré-cálculo, sem edição manual.</p>
 
     <h3>Liberado para</h3>
-    <p>${c.bloqueado.length + c.fora.length === 0
-      ? '<b>Todos os robôs da frota, em todas as missões.</b>'
-      : `<b>${nRobos - exc.size} de ${nRobos} robôs da frota em todas as missões.</b> ` +
+    <p>${!nR || !c.missoes.length ? '<b>Nada: o escopo das camadas ficou vazio.</b>'
+      : c.bloqueado.length + c.fora.length === 0
+      ? `<b>${nR === frota.length && !reduzido ? 'Todos os robôs da frota' : `Os ${nR} robôs ${deQuem}`}, em ${ondeM}.</b>`
+      : `<b>${nR - exc.size} de ${nR} robôs ${deQuem} em ${ondeM}.</b> ` +
         `Exceções: ${esc(c.liberadoTexto.replace(/^todos os robôs, todas as missões, exceto: /, ''))}.`}</p>
+
+    ${foraItens.length ? `<h3>Fora do escopo (não é defeito)</h3><ul>${foraItens.join('')}</ul>` : ''}
 
     <h3>Limites de operação</h3>
     ${lista(c.limites.map(l => `<li>${esc(l.texto)}${esc(refLimite(l))}.</li>`), 'O pré-cálculo não tem varredura.')}
     ${c.limites.length ? '<p class="muted small" style="margin-top:0">Cada limite vale sobre os robôs e missões liberados acima; onde nem o piloto de referência aguenta a perturbação, é limite físico e não conta contra o cérebro.</p>' : ''}
+    ${c.minimos.length ? `<p style="margin:4px 0 2px"><b>Mínimos exigidos</b> ${tag('certificadora')}</p>` + lista(c.minimos.map(x => {
+      const e = eixoById(x.eixo), alvo = e.binario ? `${e.nome}: exigido` : `${e.nome}: pelo menos ${e.fmt(x.nivel)}`;
+      return `<li>${esc(alvo)} · ${x.bloqueadas === null ? 'sem dados no pré-cálculo' : !x.bloqueadas ? 'todas as células liberadas aguentam'
+        : `<b>${nCel(x.bloqueadas)} não ${x.bloqueadas > 1 ? 'aguentam' : 'aguenta'}</b> e ${x.bloqueadas > 1 ? 'saem' : 'sai'} da licença (ver Bloqueado)`}.</li>`;
+    }), '') : ''}
 
-    <h3>Bloqueado (defeito do cérebro)</h3>
-    ${lista(porRobo(c.bloqueado).map(g =>
+    <h3>Bloqueado (defeito do cérebro) <span class="origem">· tolerância ${fmtNum(c.tol)} (certificadora), proibida ${PROIBIDAS[c.proibida]} (${NOME_CAMADA[c.origemProibida || 'certificadora']})</span></h3>
+    ${lista(porRobo(bloqNom, c.missoes.length).map(g =>
       `<li><b>${esc(g.nome)}</b>, ${g.missoesTexto}: o cérebro chega em ${faixa(g.itens)}, a referência em ` +
-      `${faixa(g.itens.map(i => ({ taxa: i.taxaEsp })))}. Pior caso: ${GRAV_TEXTO[pior(g.itens)]}.</li>`), 'Nada.')}
+      `${faixa(g.itens.map(i => ({ taxa: i.taxaEsp })))}. Pior caso: ${GRAV_TEXTO[pior(g.itens)]}.</li>`), bloqMin.length ? 'Nada na condição nominal.' : 'Nada.')}
+    ${itensMin.length ? `<p style="margin:4px 0 2px"><b>Não aguentam o mínimo exigido pela certificadora</b></p><ul>${itensMin.join('')}</ul>` : ''}
 
     <h3>Fora do envelope (limite físico)</h3>
-    ${lista(porRobo(c.fora).map(g =>
-      `<li><b>${esc(g.nome)}</b>, ${g.missoesTexto}: nenhum piloto conseguiu, nem o de referência. Não conta contra o cérebro.</li>`), 'Nada: em toda a frota o piloto de referência consegue.')}
+    ${lista(porRobo(c.fora, c.missoes.length).map(g =>
+      `<li><b>${esc(g.nome)}</b>, ${g.missoesTexto}: nenhum piloto conseguiu, nem o de referência. Não conta contra o cérebro.</li>`), 'Nada: no escopo, o piloto de referência sempre consegue.')}
 
     <h3>Testes físicos obrigatórios</h3>
     ${c.testes.length ? '<p class="muted small" style="margin:0">Ordenados por risco (média dos pesos: colisão grave 10, raspão 3, travou 2, quase-acidente 1). Inclui as células amarelas do nominal e as que passam raspando num limite de operação.</p>' : ''}
@@ -620,14 +796,43 @@ function renderCartao(c = cartaoAtual()) {
     <h3>O que falta treinar</h3>
     ${lista(c.treinar.map(t => `<li>${esc(t[0].toUpperCase() + t.slice(1))}.</li>`), 'Nada.')}
 
-    <div class="assinaturas">
-      <div>Certificadora<br><span class="muted">nome e data</span></div>
-      <div>Fabricante do cérebro<br><span class="muted">nome e data</span></div>
-      <div>Fábrica usuária<br><span class="muted">nome e data</span></div>
-    </div>
+    <div class="assinaturas">${assin}</div>
     <p class="muted small" style="margin-top:14px">Emitida em ${hoje} · cérebro: versão ${esc(versaoModelo || '…')} ·
       ferramenta: versão ${VERSAO_FERRAMENTA} · pré-cálculo de ${new Date(L.gerado).toLocaleDateString('pt-BR')}.</p>`;
 }
+
+// licença em JSON: camadas, assinaturas (com validade) e o conteúdo do cartão
+function licencaJSON() {
+  const c = cartaoAtual();
+  const nomeR = r => roboById(r).nome;
+  return {
+    tipo: 'licenca-de-operacao', ferramenta: VERSAO_FERRAMENTA, cerebro: E.piloto, versaoCerebro: versaoModelo,
+    emitidaEm: new Date().toISOString(), preCalculo: L.gerado, corridasPorCelula: L.reps,
+    camadas: camadasDe(E.piloto),
+    assinaturas: Object.fromEntries(CAMADAS.map(k => { const a = assDe(E.piloto)[k]; return [k, a ? { nome: a.nome, data: a.data, valida: assValida(k, E.piloto) } : null]; })),
+    licenca: {
+      licenciavel: c.licenciavel, resumo: c.resumo, tolerancia: c.tol, gravidadeProibida: c.proibida,
+      robos: c.robos.map(nomeR), missoes: c.missoes, liberado: c.liberadoTexto,
+      foraDoEscopo: [...c.foraEscopo.map(i => ({ robo: nomeR(i.robo), origem: NOME_CAMADA[i.origem], motivo: i.motivo })),
+        ...c.missoesFora.map(m => ({ missao: m, origem: NOME_CAMADA.fabrica, motivo: 'a fábrica usuária não usa' }))],
+      bloqueado: c.bloqueado.map(i => ({ robo: nomeR(i.robo), missao: i.missao, taxaCerebro: i.taxa, taxaReferencia: i.taxaEsp, pior: i.gravidade,
+        origem: i.origem === 'minimo' ? `${NOME_CAMADA.certificadora}: mínimo de ${eixoById(i.eixo).curto}` : 'defeito na condição nominal' })),
+      limiteFisico: c.fora.map(i => ({ robo: nomeR(i.robo), missao: i.missao, taxaReferencia: i.taxaEsp })),
+      limitesDeOperacao: c.limites.map(l => ({ eixo: l.eixo, limite: l.limite, referencia: l.limiteEsp, texto: l.texto })),
+      minimosDaCertificadora: c.minimos,
+      testesFisicos: c.testes.map(i => ({ risco: Math.round(i.risco * 100) / 100, texto: descTeste(i) })),
+      oQueFaltaTreinar: c.treinar
+    }
+  };
+}
+
+$('exportar').onclick = () => {
+  const blob = new Blob([JSON.stringify(licencaJSON(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `licenca-${E.piloto}.json`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
 
 $('imprimir').onclick = () => window.print();
 

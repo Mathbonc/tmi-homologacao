@@ -112,10 +112,20 @@ export const CLASSES = {
 
 // b, e: células do cérebro e do especialista nas mesmas sementes.
 // borda: é o último nível de varredura antes do limite (vira "testar").
+// Quantas corridas da célula tiveram a gravidade proibida. Os níveis se acumulam:
+// 'grave' < 'colisao' (grave ou raspão) < 'quase' (qualquer colisão ou quase-acidente).
+export const ORDEM_PROIBIDA = ['nenhuma', 'grave', 'colisao', 'quase'];
+export function nProibidas(cel, proibida) {
+  const k = ORDEM_PROIBIDA.indexOf(proibida || 'nenhuma');
+  return (k >= 1 ? contagem(cel, 'grave') : 0) + (k >= 2 ? contagem(cel, 'raspao') : 0) + (k >= 3 ? contagem(cel, 'quase') : 0);
+}
+// O piloto se mantém na célula: taxa ≥ tol e nenhuma corrida com a gravidade proibida.
+export const seMantem = (cel, tol = TOL_PADRAO, proibida = 'grave') => taxa(cel) >= tol && nProibidas(cel, proibida) === 0;
+
 export function classificar(b, e, { tol = TOL_PADRAO, proibida = 'grave', borda = false } = {}) {
   if (taxa(e) < tol) return 'limite';
   if (taxa(b) < tol) return 'defeito';
-  if (proibida && contagem(b, proibida) > 0) return contagem(e, proibida) > 0 ? 'limite' : 'defeito';
+  if (nProibidas(b, proibida) > 0) return nProibidas(e, proibida) > 0 ? 'limite' : 'defeito';
   if (borda || b.ok < b.n || contagem(b, 'quase') > 0) return 'testar';
   return 'liberado';
 }
@@ -158,7 +168,7 @@ export function varredura(eixo, porCond, escopo, opc = {}) {
       const cls = classificar(d.b[r][m], d.e[r][m], opc);
       if (cls === 'defeito') defeitos++;
       if (cls === 'liberado' || cls === 'testar') mantB++;
-      if (taxa(d.e[r][m]) >= tol && contagem(d.e[r][m], 'grave') === 0) mantE++;
+      if (seMantem(d.e[r][m], tol, opc.proibida ?? 'grave')) mantE++;
     }
     const n = escopo.length || 1;
     niveis.push({ nivel, defeitos, fracB: mantB / n, fracE: mantE / n });
@@ -216,10 +226,64 @@ export function situacoesDeTreino(bloqueios, robos, missoes) {
   return frases;
 }
 
+// ------------------------------------------------------------------ camadas (4.5)
+// Cada camada decide uma parte; a licença é a interseção. A certificadora e a fábrica valem para
+// todos os cérebros; o fabricante declara o escopo do cérebro dele.
+export const CLASSES_ROBO = {
+  diferencial: 'tração diferencial (carrinho, plataforma, esteira)',
+  carro: 'direção com eixo fixo (carro)',
+  puxado: 'puxados por roda direcional (empilhadeira)',
+  holonomico: 'holonômicos (omni, mecanum)'
+};
+export const PROIBIDAS = {
+  grave: 'colisão grave', colisao: 'qualquer colisão (grave ou raspão)',
+  quase: 'qualquer colisão ou quase-acidente', nenhuma: 'nenhuma'
+};
+const maisRigida = (a, b) => ORDEM_PROIBIDA.indexOf(b) > ORDEM_PROIBIDA.indexOf(a) ? b : a;
+export const NOME_CAMADA = { certificadora: 'certificadora', fabricante: 'fabricante do cérebro', fabrica: 'fábrica usuária' };
+
+export function camadasPadrao() {
+  return {
+    certificadora: { tol: TOL_PADRAO, proibida: 'grave', minimos: { ruido: 10, atraso: 0.1 } },
+    fabricante: { classes: Object.keys(CLASSES_ROBO) },
+    // a fábrica pode ser mais exigente que a certificadora na gravidade (null = a da certificadora)
+    fabrica: { robos: FLEET.map(f => f.id), missoes: MISSIONS.map(m => m.id), proibida: null }
+  };
+}
+
+// Escopo e regras que resultam das três camadas, sobre a frota e as missões dadas.
+export function aplicarCamadas(cam, robos, missoes) {
+  const cert = cam.certificadora, fab = cam.fabricante, usu = cam.fabrica;
+  const proibida = usu.proibida ? maisRigida(cert.proibida, usu.proibida) : cert.proibida;
+  const foraEscopo = [];
+  const dentroR = [];
+  for (const r of robos) {
+    const cls = bodyClass(corpoDe(r));
+    if (!usu.robos.includes(r)) foraEscopo.push({ robo: r, origem: 'fabrica', motivo: 'não faz parte da frota da fábrica usuária' });
+    else if (!fab.classes.includes(cls)) foraEscopo.push({ robo: r, origem: 'fabricante', classe: cls, motivo: `o fabricante declara que o cérebro não pilota robôs ${CLASSES_ROBO[cls]}` });
+    else dentroR.push(r);
+  }
+  const dentroM = missoes.filter(m => usu.missoes.includes(m));
+  return {
+    tol: cert.tol, origemTol: 'certificadora',
+    proibida, origemProibida: proibida !== cert.proibida ? 'fabrica' : 'certificadora',
+    robos: dentroR, missoes: dentroM, foraEscopo,
+    missoesFora: missoes.filter(m => !usu.missoes.includes(m)),
+    minimos: Object.entries(cert.minimos || {}).filter(([, v]) => v).map(([eixo, nivel]) => ({ eixo, nivel }))
+  };
+}
+
 // ------------------------------------------------------------------ cartão (4.4)
 // dados: { condId: { robo: { missao: célula } } } do cérebro; esp: o mesmo do especialista.
 // Devolve um objeto com tudo o que o cartão mostra; a página e o texto do terminal só formatam.
-export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
+// camadas (opcional): aplica as três camadas (escopo, tolerância, gravidade proibida, mínimos).
+export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {}, camadas = null }) {
+  let escopoCam = null;
+  if (camadas) {
+    escopoCam = aplicarCamadas(camadas, robos, missoes);
+    opc = { ...opc, tol: escopoCam.tol, proibida: escopoCam.proibida };
+    robos = escopoCam.robos; missoes = escopoCam.missoes;
+  }
   const nominal = classificarGrade(dados.nominal, esp.nominal, robos, missoes, opc);
   const nomeR = r => roboById(r).nome;
   const bloqueado = [], fora = [], testes = [], dentro = [];
@@ -232,6 +296,28 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
     else { dentro.push(item); if (cls === 'testar') testes.push(item); }
   }
 
+  // Mínimos da certificadora, por célula: uma célula liberada no nominal que tem defeito em algum
+  // nível até o mínimo exigido sai da licença (bloqueio da certificadora). Onde a referência também
+  // não aguenta o mínimo é limite físico e a célula fica. Assim a licença encolhe em vez de só reprovar.
+  const minimos = [];
+  for (const { eixo: eid, nivel } of escopoCam?.minimos || []) {
+    const eixo = eixoById(eid);
+    const ids = eixo.niveis.filter(n => n <= nivel).map(n => idCondicao(eixo, n));
+    if (!ids.length || !ids.every(id => dados[id] && esp[id])) { minimos.push({ eixo: eid, nivel, bloqueadas: null }); continue; }
+    let n = 0;
+    for (let k = dentro.length - 1; k >= 0; k--) {
+      const it = dentro[k];
+      const falha = ids.find(id => classificar(dados[id][it.robo][it.missao], esp[id][it.robo][it.missao], opc) === 'defeito');
+      if (!falha) continue;
+      const b = dados[falha][it.robo][it.missao];
+      dentro.splice(k, 1);
+      const t = testes.indexOf(it); if (t >= 0) testes.splice(t, 1);
+      bloqueado.push({ ...it, origem: 'minimo', eixo: eid, nivel: condById(falha).nivel, taxa: taxa(b), gravidade: piorGravidade(b), risco: riscoDe(b) });
+      n++;
+    }
+    minimos.push({ eixo: eid, nivel, bloqueadas: n });
+  }
+
   // liberado para: robôs inteiros e exceções
   const exc = {};
   for (const it of [...bloqueado, ...fora]) (exc[it.robo] ||= []).push(it.missao);
@@ -239,7 +325,8 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
   const robosFora = robos.filter(r => exc[r] && exc[r].length === missoes.length);
   const descExc = r => exc[r].length === missoes.length ? `${nomeR(r)} (todas as missões)` : `${nomeR(r)} (${exc[r].join(', ')})`;
   let liberadoTexto;
-  if (!Object.keys(exc).length) liberadoTexto = 'todos os robôs, todas as missões';
+  if (!robos.length || !missoes.length) liberadoTexto = 'nada (o escopo das camadas ficou vazio)';
+  else if (!Object.keys(exc).length) liberadoTexto = 'todos os robôs, todas as missões';
   else if (robosFora.length === robos.length) liberadoTexto = 'nenhum robô';
   else liberadoTexto = 'todos os robôs, todas as missões, exceto: ' + Object.keys(exc).map(descExc).join('; ');
 
@@ -251,6 +338,7 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
     return ms.length === missoes.length ? nomeR(r) : `${nomeR(r)} em ${ms.join(', ')}`;
   }))}`;
   if (fora.length) resumo += `; fora do envelope físico: ${new Set(fora.map(i => i.robo)).size} robô(s)`;
+  if (escopoCam?.foraEscopo.length) resumo += `; fora do escopo: ${juntar(escopoCam.foraEscopo.map(i => nomeR(i.robo)))}`;
 
   // limites de operação por eixo, onde houver dados
   const escopo = dentro.map(i => [i.robo, i.missao]);
@@ -292,7 +380,8 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
   }
   testes.sort((a, b) => b.risco - a.risco);
 
-  const treinar = situacoesDeTreino(bloqueado.map(i => [i.robo, i.missao]), robos, missoes);
+
+  const treinar = situacoesDeTreino(bloqueado.filter(i => i.origem !== 'minimo').map(i => [i.robo, i.missao]), robos, missoes);
   for (const l of limites) {
     const eixo = eixoById(l.eixo);
     if (eixo.binario) { if (!l.limite) treinar.push('desviar de obstáculo que surge no caminho (rota replanejada de repente)'); continue; }
@@ -302,7 +391,10 @@ export function montarCartao({ piloto, dados, esp, robos, missoes, opc = {} }) {
   return {
     piloto, versaoFerramenta: VERSAO_FERRAMENTA, tol: opc.tol ?? TOL_PADRAO,
     classes: nominal, liberadoTexto, resumo, bloqueado, fora, testes, limites, treinar, bordas,
-    licenciavel: bloqueado.length === 0
+    robos, missoes, minimos,
+    foraEscopo: escopoCam?.foraEscopo || [], missoesFora: escopoCam?.missoesFora || [],
+    origemTol: escopoCam?.origemTol || null, proibida: opc.proibida ?? 'grave', origemProibida: escopoCam?.origemProibida || null,
+    licenciavel: bloqueado.length === 0 && robos.length > 0 && missoes.length > 0
   };
 }
 
