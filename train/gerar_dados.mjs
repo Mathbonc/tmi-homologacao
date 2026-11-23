@@ -1,11 +1,16 @@
 // Gera exemplos para os cérebros imitarem: roda o especialista em muitos corpos sorteados e
 // missões, executa a ação com ruído e grava a ação limpa (para o cérebro aprender a se recuperar).
 //   node train/gerar_dados.mjs [--episodios 1600] [--semente 7]
-// Saída: train/dados/amostras.f32 + train/dados/meta.json
+//   node train/gerar_dados.mjs --atraso 0.3 --saida train/dados-atraso     (dados do cérebro 3v2)
+// Saída: train/dados/amostras.f32 + train/dados/meta.json (ou a pasta de --saida)
+// --atraso A: em cada episódio sorteia um atraso de 0 a A segundos na ação executada; o rótulo
+// gravado continua sendo a ação limpa do especialista, calculada no estado atual.
 import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { FLEET, buildBody, makeWheel, finishBody, bodyClass } from '../docs/core/parts.js';
 import { MISSIONS, WAREHOUSE } from '../docs/core/warehouse.js';
-import { World, mulberry32, clearance } from '../docs/core/physics.js';
+import { World, mulberry32, clearance, DT } from '../docs/core/physics.js';
 import { planPath, Follower } from '../docs/core/planner.js';
 import { expertAction } from '../docs/core/expert.js';
 import { wheelRaw, bodyRaw, stateRaw, N_WHEEL_RAW, N_STATE_RAW, N_BODY_RAW } from '../docs/core/brain.js';
@@ -13,6 +18,8 @@ import { wheelRaw, bodyRaw, stateRaw, N_WHEEL_RAW, N_STATE_RAW, N_BODY_RAW } fro
 const args = Object.fromEntries(process.argv.slice(2).join(' ').split('--').filter(Boolean)
   .map(s => s.trim().split(/\s+/)).map(([k, v]) => [k, v ?? true]));
 const EPISODES = +(args.episodios || 1600);
+const ATRASO_MAX = +(args.atraso || 0);
+const SAIDA = args.saida ? pathToFileURL(path.resolve(String(args.saida)) + '/') : new URL('./dados/', import.meta.url);
 const rng = mulberry32(+(args.semente || 7));
 const U = (a, b) => a + (b - a) * rng();
 const pick = arr => arr[Math.floor(rng() * arr.length)];
@@ -107,7 +114,7 @@ function push(vals) {
 }
 
 const t0 = Date.now();
-const stats = { episodios: 0, chegou: 0, bateu: 0, tempo: 0, porClasse: {} };
+const stats = { episodios: 0, chegou: 0, bateu: 0, tempo: 0, porClasse: {}, ...(ATRASO_MAX ? { atrasoMax: ATRASO_MAX, atrasoMedio: 0 } : {}) };
 for (let ep = 0; ep < EPISODES; ep++) {
   const cls = CLASSES[ep % 4];
   const body = randomBody(cls);
@@ -122,6 +129,10 @@ for (let ep = 0; ep < EPISODES; ep++) {
   const noiseS = new Float64Array(nW), noiseD = new Float64Array(nW);
   const st = {}, bd = bodyRaw(body), sRaw = new Float64Array(N_STATE_RAW), wRaw = new Float64Array(N_WHEEL_RAW);
   const ci = CLASSES.indexOf(cls);
+  // atraso do episódio (só sorteia se --atraso foi pedido: sem ele, a sequência é a de antes)
+  const nAtraso = ATRASO_MAX ? Math.round(U(0, ATRASO_MAX) / DT) : 0;
+  const fila = Array.from({ length: nAtraso }, () => [new Float64Array(nW), new Float64Array(nW)]);
+  if (ATRASO_MAX) stats.atrasoMedio += nAtraso * DT;
   while (!world.done) {
     const tg = fol.update(world);
     const meas = world.localVel();
@@ -143,7 +154,8 @@ for (let ep = 0; ep < EPISODES; ep++) {
       sp[i] = Math.max(-1, Math.min(1, act.speed[i] + noiseS[i]));
       se[i] = Math.max(-1, Math.min(1, act.steer[i] + noiseD[i]));
     }
-    world.step(sp, se);
+    if (nAtraso) { fila.push([sp, se]); const [a, b] = fila.shift(); world.step(a, b); }
+    else world.step(sp, se);
   }
   stats.episodios++;
   stats[world.reached ? 'chegou' : world.collided ? 'bateu' : 'tempo']++;
@@ -153,9 +165,10 @@ for (let ep = 0; ep < EPISODES; ep++) {
 
 function gauss() { return Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng()); }
 
-fs.mkdirSync(new URL('./dados/', import.meta.url), { recursive: true });
-fs.writeFileSync(new URL('./dados/amostras.f32', import.meta.url), Buffer.from(buf.buffer, 0, n * ROW * 4));
-fs.writeFileSync(new URL('./dados/meta.json', import.meta.url), JSON.stringify({
+if (ATRASO_MAX) stats.atrasoMedio = Math.round(1000 * stats.atrasoMedio / stats.episodios) / 1000;
+fs.mkdirSync(SAIDA, { recursive: true });
+fs.writeFileSync(new URL('amostras.f32', SAIDA), Buffer.from(buf.buffer, 0, n * ROW * 4));
+fs.writeFileSync(new URL('meta.json', SAIDA), JSON.stringify({
   n, row: ROW, nState: N_STATE_RAW, nBody: N_BODY_RAW, nWheel: N_WHEEL_RAW, classes: CLASSES, stats
 }, null, 1));
 console.log(`Pronto: ${n} amostras.`, stats);

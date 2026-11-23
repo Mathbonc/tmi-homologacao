@@ -43,6 +43,16 @@
   .defeito  { background: var(--c-defeito);  color: var(--t-defeito); }
   .limite   { background: var(--c-limite);   color: var(--t-limite); }
   .extras-tit { margin: 14px 0 2px; }
+  /* comparação de versões (4.6) */
+  .dif-melhor { background: #9fd3b4; color: #0f4a2b; }
+  .dif-pior   { background: #f0a988; color: #6f2205; }
+  .dif-igual  { background: #eceeef; color: var(--soft); font-weight: 600; }
+  td.cel.dif-melhor, td.cel.dif-pior { font-weight: 800; }
+  #cartao.comparando { border-width: 1px; }
+  .lado-a-lado { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .lado-a-lado > div { min-width: 0; }
+  .lado-a-lado .cartao-b { border-left: 1px dashed var(--line); padding-left: 18px; }
+  @media (max-width: 900px) { .lado-a-lado { grid-template-columns: 1fr; } .lado-a-lado .cartao-b { border-left: 0; padding-left: 0; border-top: 1px dashed var(--line); } }
   tr.fora-escopo td.cel, td.cel.fora-escopo { opacity: .3; }
   td.cel.min-bloq { outline: 2px dashed var(--t-defeito); outline-offset: -4px; }
   tr.fora-escopo th.robo { color: var(--soft); text-decoration: line-through; }
@@ -68,6 +78,7 @@
   td.cel .gi { font-size: 12px; margin-left: 2px; vertical-align: 1px; }
   .legenda .leg-g { flex-basis: 100%; }
   .legenda .gi-leg { font-weight: 700; }
+  #sel-comparar { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
   #sel-cond { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: #fff; max-width: 100%; }
   #resumo-cond { margin-top: 4px; }
 
@@ -142,6 +153,8 @@
       <div class="seletor" id="sel-cerebro"><span class="muted">Cérebro</span></div>
       <label class="seletor"><span class="muted">Condição</span>
         <select id="sel-cond" title="Imprevisibilidade aplicada a todas as corridas da grade (cérebro e referência)"></select></label>
+      <label class="seletor"><span class="muted">Comparar com</span>
+        <select id="sel-comparar" title="Mostra a grade como diferença entre duas versões e as duas licenças lado a lado"></select></label>
     </div>
     <div id="resumo" class="resumo">Carregando o pré-cálculo…</div>
     <div id="resumo-cond" class="muted small"></div>

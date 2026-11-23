@@ -1,6 +1,6 @@
 # Licenciador de cérebros de robô — projeto final de CIN0055
 
-> **Status:** Etapas 0 a 6 concluídas; próxima: etapa 7 · **77% concluído** · última atualização: 22/11/2026
+> **Status:** Etapas 0 a 7 concluídas; próxima: etapa 8 · **87% concluído** · última atualização: 22/11/2026
 > *(O assistente atualiza esta linha e a tabela da seção 6 ao fim de cada etapa aceita.)*
 
 Projeto final de CIN0055 Tendências em Mídia e Interação (CIn/UFPE, 2026.2), aluno Matheus
@@ -397,7 +397,7 @@ O peso é a parte do projeto que a etapa representa. Ao aceitar uma etapa, marca
 | ☑ | 4. Imprevisibilidades e varredura | 15% | 2 a 3 h | limites de operação na licença |
 | ☑ | 5. Gravidade e testes físicos | 8% | 1 h | risco, amarelos, lista de testes |
 | ☑ | 6. Camadas e assinaturas | 12% | 2 h | licença em camadas, impressa |
-| ☐ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
+| ☑ | 7. Ciclo: cérebro 3v2 e comparação | 10% | 1,5 h | antes/depois de retreinar |
 | ☐ | 8. Montador e cálculo ao vivo | 8% | 2 a 3 h | licença de robô fora da frota |
 | ☐ | 9. Fechamento: README, REGISTRO, roteiro, vídeo | 5% | 1,5 h | entrega final |
 | | **Total** | 100% | ~18 a 22 h | |
@@ -505,6 +505,14 @@ travar, segue sem ele e volta só se sobrar tempo.
   mostra regressão em nenhuma célula nominal. Se o atraso não melhorar no 3v2, registrar isso no
   README como achado ("dados de atraso sozinhos não ensinam a compensar atraso, porque o
   especialista também não compensa") em vez de forçar.
+- *Como ficou (22/11): dados novos com `--atraso 0.3` (média de 0,15 s por episódio, 426 mil
+  amostras), ajuste sem corte. O 3v2 libera tudo no nominal (as 4 células da lacuna do 3) e, ao
+  contrário do que se temia, o atraso melhorou: limite de 0,1 s (cérebros 1 a 4) para 0,2 s, igual
+  ao da referência. Nenhuma célula regrediu em nenhuma das 18 condições. Os limites de saída
+  (45° para "não tolera") e de empurrão (1,2 para 0,9 m/s) caem só porque a licença nova cobre
+  células que a do 3 nem liberava (Empilhadeira m7, Carro m7), e a comparação diz isso. Conferido
+  que o caminho `--so` de `ajustar.py` reproduz o cérebro 3 do `brains.json` (diferença até 2e-4,
+  ordem de soma) e que `gerar_dados.mjs` sem `--atraso` gera os mesmos bytes de antes.*
 
 ### Etapa 8 — Montador e cálculo ao vivo (2 a 3 h)
 

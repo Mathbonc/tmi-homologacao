@@ -1,8 +1,11 @@
 """Ajusta os 4 cérebros por mínimos quadrados com regularização (ridge).
 
     python train/ajustar.py [--lam 1e-3] [--na 40] [--nb 22]
+    python train/ajustar.py --dados train/dados-atraso --so cerebro3v2 --saida docs/model/cerebro3v2.json
 
 Lê train/dados/ (gerado por gerar_dados.mjs) e grava docs/model/brains.json.
+Com --so, ajusta um cérebro só e grava no arquivo de --saida (nunca em brains.json, que guarda
+os 4 cérebros congelados do experimento).
 A expansão em características repete makeExpander() de docs/core/brain.js.
 Cada cérebro vê um subconjunto dos dados; a lacuna de cada um está em LACUNAS.
 """
@@ -21,10 +24,28 @@ ap.add_argument('--nb', type=int, default=22)
 ap.add_argument('--semente', type=int, default=12345)
 ap.add_argument('--lowpass', type=float, default=1.0)
 ap.add_argument('--corte3', type=float, default=60, help='cérebro 3 não vê |alfa| acima disto (graus)')
+ap.add_argument('--dados', default=os.path.join(HERE, 'dados'), help='pasta(s) de amostras, separadas por vírgula')
+ap.add_argument('--so', default=None, help='ajusta um cérebro só (ex.: cerebro3v2); exige --saida')
+ap.add_argument('--saida', default=None, help='arquivo de saída do --so')
 args = ap.parse_args()
 
-meta = json.load(open(os.path.join(HERE, 'dados', 'meta.json')))
-data = np.fromfile(os.path.join(HERE, 'dados', 'amostras.f32'), dtype=np.float32).reshape(meta['n'], meta['row'])
+BRAINS_JSON = os.path.join(ROOT, 'docs', 'model', 'brains.json')
+if args.so:
+    if not args.saida:
+        sys.exit('--so exige --saida')
+    if os.path.abspath(args.saida) == os.path.abspath(BRAINS_JSON):
+        sys.exit('recusado: brains.json guarda os cérebros congelados do experimento; escolha outro arquivo')
+
+pastas = [p.strip() for p in args.dados.split(',') if p.strip()]
+metas, partes = [], []
+for p in pastas:
+    m = json.load(open(os.path.join(p, 'meta.json')))
+    metas.append(m)
+    partes.append(np.fromfile(os.path.join(p, 'amostras.f32'), dtype=np.float32).reshape(m['n'], m['row']))
+    if m['row'] != metas[0]['row'] or m['classes'] != metas[0]['classes']:
+        sys.exit(f'formato diferente em {p}')
+meta = dict(metas[0], n=sum(m['n'] for m in metas))
+data = np.concatenate(partes) if len(partes) > 1 else partes[0]
 nS, nBd, nW = meta['nState'], meta['nBody'], meta['nWheel']
 CLASSES = meta['classes']
 S = data[:, :nS].astype(np.float64)
@@ -77,6 +98,46 @@ DESCRICAO = {
     'cerebro3': f'Só viu o destino à frente (erro de direção abaixo de {args.corte3:.0f}°): nunca treinou meia-volta.',
     'cerebro4': 'Nunca viu robôs holonômicos (rodas omni ou mecanum, que andam de lado).',
 }
+# Cérebros novos, ajustados um de cada vez com --so (não entram em brains.json).
+LACUNAS_NOVOS = {
+    'cerebro3v2': np.zeros(len(cls), bool),                             # o 3 retreinado: sem o corte
+}
+DESCRICAO_NOVOS = {
+    'cerebro3v2': 'O cérebro 3 retreinado com o que a licença dele pediu: alvo atrás (sem o corte de 60°) '
+                  'e atraso de comando nos dados.',
+}
+
+if args.so:
+    todas = {**LACUNAS, **LACUNAS_NOVOS}
+    if args.so not in todas:
+        sys.exit(f'cérebro desconhecido: {args.so}')
+    lac = todas[args.so]
+    brain = {}
+    for key, mask, y in (('W', driven, y_speed), ('V', steer, y_steer)):
+        t0 = time.time()
+        idx = np.nonzero(mask & ~lac)[0]
+        G = np.zeros((D, D)); r = np.zeros(D)
+        for k in range(0, len(idx), 6000):
+            j = idx[k:k + 6000]
+            X = (phi(S[j], BD[j])[:, :, None] * psi(WR[j])[:, None, :]).reshape(len(j), D).astype(np.float32)
+            G += (X.T @ X).astype(np.float64)
+            r += X.T.astype(np.float64) @ y[j]
+        lam = args.lam * np.trace(G) / D
+        brain[key] = np.round(np.linalg.solve(G + lam * np.eye(D), r).reshape(nPhi, nPsi), 6).tolist()
+        print(f'{args.so} {key}: {len(idx)} amostras, {time.time() - t0:.0f} s')
+        del G, r
+    out = {
+        'versao': time.strftime('%Y-%m-%d %H:%M'),
+        'features': feat, 'lowpass': args.lowpass, 'lam': args.lam,
+        'lacunas': {args.so: {**DESCRICAO, **DESCRICAO_NOVOS}[args.so]},
+        'dados': [{'pasta': os.path.relpath(p, ROOT).replace(os.sep, '/'), 'n': m['n'], 'stats': m.get('stats')} for p, m in zip(pastas, metas)],
+        'brains': {args.so: brain},
+    }
+    os.makedirs(os.path.dirname(os.path.abspath(args.saida)), exist_ok=True)
+    json.dump(out, open(args.saida, 'w'), separators=(',', ':'))
+    print(f'gravado {args.saida} ({os.path.getsize(args.saida) / 1e6:.1f} MB)')
+    sys.exit(0)
+
 # Grupos = padrões de exclusão; cada cérebro soma os grupos que pode ver.
 pattern = sum(m.astype(int) << i for i, m in enumerate(LACUNAS.values()))
 groups = sorted(set(pattern.tolist()))
@@ -122,7 +183,7 @@ out = {
     'lacunas': DESCRICAO,
     'brains': brains,
 }
-path = os.path.join(ROOT, 'docs', 'model', 'brains.json')
+path = BRAINS_JSON
 # preserva a tabela de verdade se já existir (avaliar.mjs a regrava depois)
 if os.path.exists(path):
     try:

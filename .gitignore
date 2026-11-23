@@ -1,6 +1,7 @@
 node_modules/
 .DS_Store
 train/dados/
+train/dados-*/
 __pycache__/
 
 # respostas originais da turma (com apelidos): só a versão anonimizada em dados/ é versionada

@@ -5,7 +5,7 @@ import { MISSIONS, WAREHOUSE, missionById } from './core/warehouse.js';
 import { Run, PASSO_OBSTACULO, PASSO_EMPURRAO } from './core/episode.js';
 import { DT } from './core/physics.js';
 import { drawWarehouse, drawPath, drawTrail, drawRobotAt, drawRobot, drawTarget, viewFor, C } from './core/draw.js';
-import { loadPilot, loadModel, BRAIN_NAMES } from './core/pilots.js';
+import { loadPilot, loadModel, TODOS_CEREBROS as BRAIN_NAMES } from './core/pilots.js';
 import {
   ROBOS, roboById, corpoDe, condById, classificar, montarCartao, taxa, riscoDe, piorGravidade, contagem,
   GRAVIDADES, GRAV_TEXTO, CLASSES, TOL_PADRAO, VERSAO_FERRAMENTA, CONDICOES, EIXOS, eixoById, idCondicao, descTeste,
@@ -17,7 +17,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtT = s => s.toFixed(1).replace('.', ',') + ' s';
 const pct = x => `${Math.round(100 * x)}%`;
-const NOME_PILOTO = { especialista: 'Piloto de referência', cerebro1: 'Cérebro 1', cerebro2: 'Cérebro 2', cerebro3: 'Cérebro 3', cerebro4: 'Cérebro 4' };
+const NOME_PILOTO = { especialista: 'Piloto de referência', cerebro1: 'Cérebro 1', cerebro2: 'Cérebro 2', cerebro3: 'Cérebro 3', cerebro4: 'Cérebro 4', cerebro3v2: 'Cérebro 3v2' };
+// para quem se compara cada versão por padrão
+const VERSAO_ANTERIOR = { cerebro3v2: 'cerebro3' };
 const SIMBOLO = { liberado: '✓', testar: '!', defeito: '✕', limite: '–' };
 const DESC_CLASSE = {
   liberado: 'cérebro dentro da tolerância, sem a gravidade proibida',
@@ -43,7 +45,7 @@ const fmtRisco = x => x.toFixed(2).replace('.', ',');
 
 // ---------------------------------------------------------------- estado
 let L = null;                      // licencas.json
-const E = { piloto: 'cerebro1', cond: 'nominal', robo: null, missao: null };
+const E = { piloto: 'cerebro1', cond: 'nominal', robo: null, missao: null, comparar: null };
 const opc = { tol: TOL_PADRAO };
 
 const celula = (p, r, m, cond = E.cond) => L.pilotos[p]?.[cond]?.[r]?.[m];
@@ -74,16 +76,19 @@ async function iniciar() {
 }
 let versaoModelo = null;
 
-// #cerebro1/robo/missao@condição (robô, missão e condição são opcionais)
+// #cerebro1/robo/missao@condição~comparado (robô, missão, condição e comparação são opcionais)
 function lerHash() {
-  const [base, cond] = decodeURIComponent(location.hash.slice(1)).split('@');
+  const [semCmp, cmp] = decodeURIComponent(location.hash.slice(1)).split('~');
+  const [base, cond] = semCmp.split('@');
   const [p, r, m] = base.split('/');
   if (BRAIN_NAMES.includes(p) && L.pilotos[p]) E.piloto = p;
   if (roboById(r) && missionById(m)) { E.robo = r; E.missao = m; }
   E.cond = cond && condById(cond) && temCond(cond) ? cond : 'nominal';
+  E.comparar = cmp && cmp !== E.piloto && BRAIN_NAMES.includes(cmp) && L.pilotos[cmp] ? cmp : null;
 }
 function gravarHash() {
-  const h = [E.piloto, ...(E.robo ? [E.robo, E.missao] : [])].join('/') + (E.cond !== 'nominal' ? '@' + E.cond : '');
+  const h = [E.piloto, ...(E.robo ? [E.robo, E.missao] : [])].join('/') + (E.cond !== 'nominal' ? '@' + E.cond : '') +
+    (E.comparar ? '~' + E.comparar : '');
   history.replaceState(null, '', '#' + h);
 }
 window.addEventListener('hashchange', () => { lerHash(); player.parar(); marcarSeletor(); render(); });
@@ -116,17 +121,35 @@ function montarSeletor() {
     b.textContent = NOME_PILOTO[p].replace('Cérebro ', '');
     b.title = NOME_PILOTO[p];
     b.dataset.p = p;
-    b.onclick = () => { E.piloto = p; player.parar(); marcarSeletor(); render(); };
+    b.onclick = () => {
+      E.piloto = p;
+      // ao abrir uma versão nova, já compara com a anterior; ao voltar para uma antiga, desliga
+      E.comparar = VERSAO_ANTERIOR[p] && L.pilotos[VERSAO_ANTERIOR[p]] ? VERSAO_ANTERIOR[p] : E.comparar === p ? null : E.comparar;
+      player.parar(); marcarSeletor(); render();
+    };
     box.append(b);
   }
+  const sc = $('sel-comparar');
+  sc.innerHTML = '';
+  const op = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; return o; };
+  sc.append(op('', 'nada'));
+  for (const p of BRAIN_NAMES) if (L.pilotos[p]) sc.append(op(p, NOME_PILOTO[p]));
+  sc.onchange = () => { E.comparar = sc.value && sc.value !== E.piloto ? sc.value : null; player.parar(); marcarSeletor(); render(); };
   marcarSeletor();
 }
 function marcarSeletor() {
   for (const b of $('sel-cerebro').querySelectorAll('button')) b.classList.toggle('sel', b.dataset.p === E.piloto);
   $('sel-cond').value = E.cond;
+  $('sel-comparar').value = E.comparar || '';
 }
 
 function montarLegenda() {
+  if (E.comparar) {
+    $('legenda').innerHTML = `<span><span class="sw dif-melhor">+</span><b>Passou a liberar</b></span>` +
+      `<span><span class="sw dif-pior">−</span><b>Regrediu</b></span><span><span class="sw dif-igual">=</span><b>Igual</b></span>` +
+      `<span class="muted">Cada célula: taxa de ${esc(NOME_PILOTO[E.comparar].toLowerCase())} → taxa de ${esc(NOME_PILOTO[E.piloto].toLowerCase())}.</span>`;
+    return;
+  }
   $('legenda').innerHTML = Object.keys(CLASSES).map(k =>
     `<span><span class="sw ${k}">${SIMBOLO[k]}</span><b>${CLASSES[k].nome}</b> <span class="muted">${DESC_CLASSE[k]}</span></span>`).join('') +
     `<span class="leg-g"><b>Pior caso nas corridas do cérebro:</b> ` +
@@ -137,13 +160,14 @@ function montarLegenda() {
 // ---------------------------------------------------------------- render geral
 function render() {
   gravarHash();
+  montarLegenda();
   const cartao = cartaoVig = cartaoAtual();
   bordasCartao = cartao.bordas;
   Object.assign(opc, { tol: cartao.tol, proibida: cartao.proibida });   // as camadas decidem
   const r = $('resumo');
   r.textContent = `${NOME_PILOTO[E.piloto]}: ${cartao.resumo}.`;
   r.className = 'resumo ' + (cartao.licenciavel ? 'ok' : 'bad');
-  $('resumo-cond').innerHTML = resumoCond();
+  $('resumo-cond').innerHTML = E.comparar ? resumoComparacao(cartaoAtual(E.comparar)) : resumoCond();
   renderGrade($('grade'), frota, true);
   renderGrade($('grade-extras'), extras.filter(x => celula(E.piloto, x, missoes[0])), false);
   $('rodape-grade').textContent = `Cada célula: ${L.reps} corridas com as sementes ${L.seed0} a ${L.seed0 + L.reps - 1}, as mesmas para o cérebro e para a referência. ` +
@@ -156,10 +180,52 @@ function render() {
 let cartaoVig = null;
 
 // O cartão é sempre o da licença: classes do nominal + limites de operação de toda a varredura.
-function cartaoAtual() {
+function cartaoAtual(p = E.piloto) {
   const dados = {}, esp = {};
-  for (const c of CONDICOES) if (temCond(c.id)) { dados[c.id] = L.pilotos[E.piloto][c.id]; esp[c.id] = L.pilotos.especialista[c.id]; }
-  return montarCartao({ piloto: E.piloto, dados, esp, robos: frota, missoes, opc, camadas: camadasDe(E.piloto) });
+  for (const c of CONDICOES) if (temCond(c.id, p)) { dados[c.id] = L.pilotos[p][c.id]; esp[c.id] = L.pilotos.especialista[c.id]; }
+  return montarCartao({ piloto: p, dados, esp, robos: frota, missoes, opc, camadas: camadasDe(p) });
+}
+
+// ---------------------------------------------------------------- comparação de versões (4.6)
+const dentroDe = (p, r, m, cond = E.cond) => CLASSES[classificar(celula(p, r, m, cond), celula('especialista', r, m, cond), opc)].dentro;
+// diferença de uma célula entre o cérebro atual (novo) e o comparado (antigo)
+function difCelula(r, m, cond = E.cond) {
+  const a = dentroDe(E.comparar, r, m, cond), b = dentroDe(E.piloto, r, m, cond);
+  return a === b ? 'igual' : b ? 'melhor' : 'pior';
+}
+function resumoComparacao(cA) {
+  const nomeA = NOME_PILOTO[E.comparar], nomeB = NOME_PILOTO[E.piloto];
+  const conta = cond => {
+    const n = { melhor: [], pior: [] };
+    for (const r of frota) for (const m of missoes) { const d = difCelula(r, m, cond); if (d !== 'igual') n[d].push(`${roboById(r).nome} ${m}`); }
+    return n;
+  };
+  const aqui = conta(E.cond);
+  let piorEmAlguma = 0;
+  for (const c of CONDICOES) if (temCond(c.id) && temCond(c.id, E.comparar)) piorEmAlguma += conta(c.id).pior.length;
+  // limites: o que mudou, e se a queda vem só de células que a versão antiga nem liberava
+  const cB = cartaoVig, linhas = [];
+  for (const lb of cB.limites) {
+    const la = cA.limites.find(x => x.eixo === lb.eixo); if (!la || la.limite === lb.limite) continue;
+    const e = eixoById(lb.eixo), f = v => e.binario ? (v ? 'sim' : 'não') : v ? e.fmt(v) : 'não tolera';
+    let txt = `${e.nome}: ${f(la.limite)} → ${f(lb.limite)}`;
+    if (lb.limite < la.limite) {
+      const nivel = e.niveis.find(n => n > lb.limite), id = idCondicao(e, nivel);
+      const caem = cB.robos.flatMap(r => cB.missoes.filter(m => CLASSES[cB.classes[r][m]].dentro &&
+        classificar(celula(E.piloto, r, m, id), celula('especialista', r, m, id), opc) === 'defeito').map(m => [r, m]));
+      const novas = caem.filter(([r, m]) => !dentroDe(E.comparar, r, m, 'nominal'));
+      txt += novas.length === caem.length
+        ? ` (só porque a licença nova cobre mais células: ${juntar(novas.map(([r, m]) => `${roboById(r).nome} ${m}`))}, que o ${nomeA.toLowerCase()} nem liberava, ` +
+          `não ${novas.length > 1 ? 'aguentam' : 'aguenta'} ${e.fmt(nivel)})`
+        : ' (piorou)';
+    } else txt += ' (melhorou)';
+    linhas.push(txt);
+  }
+  return `<b>Comparando ${esc(nomeB)} com ${esc(nomeA)}</b> na grade (${esc(rotuloCond(E.cond))}): ` +
+    `${aqui.melhor.length} célula${aqui.melhor.length === 1 ? '' : 's'} passa${aqui.melhor.length === 1 ? '' : 'm'} a liberar, ` +
+    `${aqui.pior.length} regred${aqui.pior.length === 1 ? 'iu' : 'iram'}. ` +
+    (piorEmAlguma ? `<b>Em todas as condições juntas, ${piorEmAlguma} regressões.</b>` : 'Nenhuma célula regrediu em nenhuma das condições.') +
+    (linhas.length ? `<br>Limites de operação: ${esc(linhas.join('; '))}.` : '');
 }
 
 // Linha abaixo do resumo: o que a condição escolhida muda na grade em relação ao nominal.
@@ -219,6 +285,15 @@ function renderGrade(tab, robos, cabecalho) {
       const td = tr.insertCell();
       const bMin = cabecalho && E.cond === 'nominal' ? cartaoVig.bloqueado.find(i => i.origem === 'minimo' && i.robo === r && i.missao === m) : null;
       td.className = `cel ${cls}` + (E.robo === r && E.missao === m ? ' sel' : '') + (mFora.includes(m) ? ' fora-escopo' : '') + (bMin ? ' min-bloq' : '');
+      if (E.comparar) {
+        const d = difCelula(r, m), ba = celula(E.comparar, r, m);
+        td.className = `cel dif-${d}` + (E.robo === r && E.missao === m ? ' sel' : '');
+        td.innerHTML = `${pct(taxa(ba))}→${pct(taxa(b))}`;
+        td.title = `${roboById(r).nome} · ${missionById(m).nome}\n` + { melhor: 'Passou a liberar', pior: 'Regrediu', igual: 'Igual nas duas versões' }[d] +
+          `\n${NOME_PILOTO[E.comparar]}: ${ba.ok}/${ba.n} chegaram\n${NOME_PILOTO[E.piloto]}: ${b.ok}/${b.n} chegaram\nReferência: ${e.ok}/${e.n} chegaram`;
+        td.onclick = () => { E.robo = r; E.missao = m; player.parar(); render(); };
+        continue;
+      }
       const g = piorGravidade(b);
       td.innerHTML = `${pct(taxa(b))} ${SIMBOLO[cls]}` + (ICONE_G[g] ? `<span class="gi">${ICONE_G[g]}</span>` : '');
       td.title = `${roboById(r).nome} · ${missionById(m).nome}\n${CLASSES[cls].nome}` +
@@ -601,7 +676,7 @@ function carregarCamadas() {
   base.fabrica.proibida = PROIBIDAS[f.proibida] && f.proibida !== 'nenhuma' ? f.proibida : null;
   for (const [p, v] of Object.entries(s.fabricantes || {})) {
     const cl = lista(v?.classes, Object.keys(CLASSES_ROBO));
-    if (BRAIN_NAMES.includes(p) && cl) base.fabricantes[p] = { classes: cl };
+    if (BRAIN_NAMES.includes(p) && cl) base.fabricantes[p] = { classes: cl };   // inclui as versões novas
   }
   return base;
 }
@@ -705,7 +780,7 @@ function porRobo(itens, nMissoes = missoes.length) {
 
 const tag = k => `<span class="origem">· ${NOME_CAMADA[k]}</span>`;
 
-function renderCartao(c = cartaoAtual()) {
+function htmlCartao(c) {
   const hoje = new Date().toLocaleDateString('pt-BR');
   const ord = ['grave', 'raspao', 'travou', 'quase', 'ok'];
   const pior = xs => ord.find(g => xs.some(i => i.gravidade === g));
@@ -750,7 +825,7 @@ function renderCartao(c = cartaoAtual()) {
         (v ? '' : '<br><span class="velha small">assinou outra configuração: não vale para esta</span>')) + '</div>';
   }).join('');
 
-  $('cartao').innerHTML = `
+  return `
     <div class="row" style="align-items:baseline">
       <h2>Licença de operação · ${esc(NOME_PILOTO[c.piloto])}</h2>
       <span class="grow"></span>
@@ -799,6 +874,13 @@ function renderCartao(c = cartaoAtual()) {
     <div class="assinaturas">${assin}</div>
     <p class="muted small" style="margin-top:14px">Emitida em ${hoje} · cérebro: versão ${esc(versaoModelo || '…')} ·
       ferramenta: versão ${VERSAO_FERRAMENTA} · pré-cálculo de ${new Date(L.gerado).toLocaleDateString('pt-BR')}.</p>`;
+}
+
+// Um cartão, ou os dois lado a lado quando há comparação de versões (4.6).
+function renderCartao(c = cartaoAtual()) {
+  if (!E.comparar) { $('cartao').classList.remove('comparando'); $('cartao').innerHTML = htmlCartao(c); return; }
+  $('cartao').classList.add('comparando');
+  $('cartao').innerHTML = `<div class="lado-a-lado"><div>${htmlCartao(c)}</div><div class="cartao-b">${htmlCartao(cartaoAtual(E.comparar))}</div></div>`;
 }
 
 // licença em JSON: camadas, assinaturas (com validade) e o conteúdo do cartão

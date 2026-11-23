@@ -38,7 +38,7 @@ if (!isMainThread) {
 }
 
 async function principal() {
-  const { PILOT_NAMES, BRAIN_NAMES } = await import('../docs/core/pilots.js');
+  const { PILOTOS_LICENCA: PILOT_NAMES, TODOS_CEREBROS: BRAIN_NAMES } = await import('../docs/core/pilots.js');
   const args = Object.fromEntries(process.argv.slice(2).join(' ').split('--').filter(Boolean)
     .map(s => s.trim().split(/\s+/)).map(([k, v]) => [k, v ?? true]));
   const lista = v => String(v).split(',').map(s => s.trim()).filter(Boolean);
@@ -118,7 +118,8 @@ const GABARITO = {
   cerebro1: [],
   cerebro2: TODAS('empilhadeira'),
   cerebro3: [['carro', 'm6'], ['carro', 'm7'], ['empilhadeira', 'm6'], ['empilhadeira', 'm7']],
-  cerebro4: [...TODAS('omni3'), ...TODAS('mecanum')]
+  cerebro4: [...TODAS('omni3'), ...TODAS('mecanum')],
+  cerebro3v2: []        // o 3 retreinado: espera-se que libere carro e empilhadeira em m6 e m7
 };
 
 function imprimir(dados, brainNames) {
